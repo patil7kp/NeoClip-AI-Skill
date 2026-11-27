@@ -10,13 +10,8 @@ already used, so it never makes the same Short twice.
   agent that can read Markdown and run a command. ChatGPT and Gemini web apps can plan, and the engine runs
   locally. See [`references/agent-compatibility.md`](references/agent-compatibility.md).
 - **No paid AI API needed.** Video work is done by FFmpeg, OpenCV and local Whisper. The agent supplies judgement.
-- **Output stays simple:**
-  ```
-  YouTube_Shorts/2026-11-27/01_best_reaction.mp4
-                           02_funny_moment.mp4
-                           03_epic_gameplay.mp4
-                           YOUTUBE_METADATA.md
-  ```
+- **Output stays simple:** each processing date gets its own folder containing only the finished Shorts (`.mp4`)
+  and one `YOUTUBE_METADATA.md` with titles, descriptions and hashtags.
 
 ## Features
 | | |
@@ -75,25 +70,6 @@ Optional `~/.neoclip-ai-skill/config.json` (all keys: `scripts/config.py`):
 ```
 Environment: `YT_SHORTS_STATE_DIR`, `YT_SHORTS_OUTPUT_ROOT`, `YT_SHORTS_RESOLUTION`, `YT_SHORTS_WHISPER_MODEL`,
 `YT_SHORTS_AI_COMMAND`, `YT_SHORTS_MUSIC_LIBRARY`.
-
-## Project layout
-```
-SKILL.md                 agent instructions (Agent Skills format)
-AGENTS.md / GEMINI.md / .cursor/rules/   entry points for other agents
-AUTHOR.md, LICENSE, THIRD_PARTY_NOTICES.md   author, copyright, third-party licences
-platforms/               ChatGPT, Gemini, Claude, Cursor specifics
-references/              detailed guidance, loaded on demand
-templates/               5 templates (guidance + JSON config block)
-workflows/               step-by-step procedures
-scripts/                 the engine (cli.py is the entry point)
-schemas/                 JSON Schemas: history, source metadata, results, plan
-tests/                   pytest suite (synthetic media, no network)
-examples/                example session and metadata file
-```
-Architecture: `cli.py` → `pipeline.py` → {`source_input`, `video_analyzer`, `audio_analyzer`, `transcription`} →
-`clip_selector` (+ `timestamp_manager`) → per clip {`video_editor` + `video_cutter`, `smart_cropper`,
-`caption_generator`, `audio_processor`, `policy_checker`} → `video_renderer` → `quality_validator` →
-`metadata_generator`. AI reasoning stays in the agent (or the optional `ai_bridge.py`).
 
 ## Tests
 ```bash
