@@ -1,6 +1,6 @@
-# NeoClip AI
+# NeoClip-AI-Skill
 
-**Created by Kiran Patil - NeoClip AI** · v1.0.0 · © 2026 Kiran Patil. All Rights Reserved.
+**Created by Kiran Patil - NeoClip-AI-Skill** · v1.0.0 · © 2026 Kiran Patil. All Rights Reserved.
 
 A cross-agent AI skill that turns long videos (YouTube URLs or local files) into edited, captioned,
 9:16 YouTube Shorts. It also writes publishing metadata and remembers which parts of each video it has
@@ -43,7 +43,7 @@ python scripts/cli.py doctor          # → "ready": true
 python scripts/cli.py setup-models    # optional: YuNet face model (needed for face tracking on OpenCV 5)
 ```
 Then install it for your agent ([details](references/agent-compatibility.md)):
-- **Claude Code:** `cp -r neoclip-ai ~/.claude/skills/`
+- **Claude Code:** `cp -r neoclip-ai-skill ~/.claude/skills/`
 - **Codex / Cursor / Copilot / others:** open the folder as the workspace (`AGENTS.md`, `.cursor/rules/`).
 - **Gemini CLI:** run `gemini` inside the folder (`GEMINI.md`).
 
@@ -67,7 +67,7 @@ python scripts/cli.py templates list | use <id> | set <id> key=value | reset <id
 Speed: `--resolution 1080x1920` renders about 4× faster than the 4K default.
 
 ## Configuration
-Optional `~/.neoclip-ai/config.json` (all keys: `scripts/config.py`):
+Optional `~/.neoclip-ai-skill/config.json` (all keys: `scripts/config.py`):
 ```json
 {"output_root": "~/Videos/YouTube_Shorts", "resolution": "2160x3840", "whisper_model": "small",
  "caption_corrections": {"valorent": "Valorant"}, "music_library": "~/Music/licensed/music_library.json",
@@ -119,7 +119,7 @@ monetization or reach. YouTube makes those decisions.
 
 ## Author & Copyright Information
 
-**Project Name:** NeoClip AI
+**Project Name:** NeoClip-AI-Skill
 **Created & Developed By:** Kiran Patil
 **Role:** Software Engineer
 **Project Type:** AI Agent Skill – YouTube Shorts Automation
@@ -132,10 +132,10 @@ monetization or reach. YouTube makes those decisions.
 
 ### Ownership & Attribution
 
-NeoClip AI is an independently developed AI Agent Skill designed for intelligent video clipping, automated
+NeoClip-AI-Skill is an independently developed AI Agent Skill designed for intelligent video clipping, automated
 YouTube Shorts creation, video editing, and publishing metadata generation.
 
-The original architecture, workflows, documentation, and custom templates developed for NeoClip AI are
+The original architecture, workflows, documentation, and custom templates developed for NeoClip-AI-Skill are
 attributed to Kiran Patil.
 
 ### Copyright Notice
@@ -152,7 +152,7 @@ Third-party libraries, AI models, tools, and dependencies remain subject to thei
 
 When sharing, distributing, or referencing this skill, provide the following attribution:
 
-**Created by Kiran Patil - NeoClip AI**
+**Created by Kiran Patil - NeoClip-AI-Skill**
 
 ### Important
 

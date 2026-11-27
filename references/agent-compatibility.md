@@ -13,13 +13,13 @@ how the instructions get loaded and whether a shell is available.
 
 | Agent | How it loads the skill | Runs the engine? | Notes |
 |---|---|---|---|
-| **Claude Code** (CLI, desktop, web) | Native Agent Skills: copy the folder to `~/.claude/skills/neoclip-ai/` (personal) or `.claude/skills/` (project) | Yes | Best supported. The skill triggers from its `description`. |
+| **Claude Code** (CLI, desktop, web) | Native Agent Skills: copy the folder to `~/.claude/skills/neoclip-ai-skill/` (personal) or `.claude/skills/` (project) | Yes | Best supported. The skill triggers from its `description`. |
 | **Claude.ai / Claude desktop (Skills)** | Upload the folder as a skill (zip) in Settings → Capabilities → Skills | Only where code execution is enabled **and** FFmpeg is available | The hosted sandbox may lack network access for YouTube, or FFmpeg/libass. Local files are best. |
 | **OpenAI Codex CLI** | Reads `AGENTS.md`. Newer Codex versions also load `SKILL.md` skills from `~/.codex/skills/` | Yes | `AGENTS.md` points the agent at `SKILL.md`. |
 | **ChatGPT (web/app)** | Paste `platforms/chatgpt-instructions.md` into a Project or Custom GPT and attach `SKILL.md` + references | **Usually no.** The ChatGPT sandbox has no internet and its FFmpeg build is not guaranteed | Use ChatGPT for planning (it writes `plan.json`) and run the engine locally, or use the Codex CLI. |
 | **Gemini CLI** | Reads `GEMINI.md` (context file) in the project root | Yes | `GEMINI.md` imports `SKILL.md`. |
 | **Gemini (web/app)** | Paste `platforms/gemini-instructions.md` into a Gem | No local shell | Planning only, like ChatGPT web. |
-| **Cursor** | `.cursor/rules/neoclip-ai.mdc` (agent-requested rule) and `AGENTS.md` | Yes (agent terminal) | Open the skill folder or add it to the workspace. |
+| **Cursor** | `.cursor/rules/neoclip-ai-skill.mdc` (agent-requested rule) and `AGENTS.md` | Yes (agent terminal) | Open the skill folder or add it to the workspace. |
 | **GitHub Copilot agent mode, Windsurf, Cline, Roo, Aider, others** | `AGENTS.md` (widely supported) or reference `SKILL.md` manually | Yes, if the agent has a terminal | All you need is the ability to read Markdown and run a command. |
 
 > The Agent Skills format (`SKILL.md` with YAML front matter) is an open standard that a growing number of
@@ -28,8 +28,8 @@ how the instructions get loaded and whether a shell is available.
 ## Installation
 
 ```bash
-git clone <your copy> neoclip-ai    # or unzip the release
-cd neoclip-ai
+git clone <your copy> neoclip-ai-skill    # or unzip the release
+cd neoclip-ai-skill
 python -m pip install -r requirements.txt
 python scripts/cli.py doctor
 ```
@@ -38,13 +38,13 @@ or `sudo apt install ffmpeg` (Debian/Ubuntu). The build must include libass. Sta
 
 ### Claude Code
 ```bash
-mkdir -p ~/.claude/skills && cp -r neoclip-ai ~/.claude/skills/
+mkdir -p ~/.claude/skills && cp -r neoclip-ai-skill ~/.claude/skills/
 ```
 Ask: "Make 3 Shorts from ~/Videos/stream.mp4 with the gaming template, I own it."
 
 ### Codex CLI / Cursor / Copilot / others reading AGENTS.md
 Open the skill folder as the workspace, or copy `AGENTS.md` into your project and fix the path inside it.
-In Cursor, `.cursor/rules/neoclip-ai.mdc` is picked up automatically when the folder is in the workspace.
+In Cursor, `.cursor/rules/neoclip-ai-skill.mdc` is picked up automatically when the folder is in the workspace.
 
 ### Gemini CLI
 Run `gemini` from inside the skill folder. `GEMINI.md` is loaded automatically and imports `SKILL.md`.
@@ -69,7 +69,7 @@ Run `gemini` from inside the skill folder. `GEMINI.md` is loaded automatically a
 
 ## Where state lives (same for every agent)
 
-`~/.neoclip-ai/` (override with `YT_SHORTS_STATE_DIR`):
+`~/.neoclip-ai-skill/` (override with `YT_SHORTS_STATE_DIR`):
 `history/` (timestamp memory), `preferences.json` (remembered template), `config.json` (optional settings),
 `work/` (downloads, analysis cache, temporary renders), `models/` (optional face model),
 `music_library.json` (your verified tracks). Because this is plain files, memory survives new sessions and

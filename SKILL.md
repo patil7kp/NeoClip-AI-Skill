@@ -1,18 +1,18 @@
 ---
-name: neoclip-ai
-description: NeoClip AI turns long videos (YouTube URL or local MP4/MOV/MKV/WebM) into edited 9:16 YouTube Shorts with smart cropping, gaming facecam layouts, synced captions, policy/copyright risk checks and a YOUTUBE_METADATA.md per date. Remembers used timestamps across sessions so repeat runs never duplicate clips. Use when the user wants Shorts/clips/highlights cut from a video, more Shorts from a video processed before, or to pick/customize a Shorts editing template.
+name: neoclip-ai-skill
+description: NeoClip-AI-Skill turns long videos (YouTube URL or local MP4/MOV/MKV/WebM) into edited 9:16 YouTube Shorts with smart cropping, gaming facecam layouts, synced captions, policy/copyright risk checks and a YOUTUBE_METADATA.md per date. Remembers used timestamps across sessions so repeat runs never duplicate clips. Use when the user wants Shorts/clips/highlights cut from a video, more Shorts from a video processed before, or to pick/customize a Shorts editing template.
 license: Proprietary. © 2026 Kiran Patil. All Rights Reserved. See LICENSE.
 compatibility: Needs Python 3.10+, FFmpeg (with libass) on PATH, and `pip install -r requirements.txt`. Shell access required. YouTube input also needs yt-dlp and network access.
 metadata:
   version: "1.0.0"
   author: "Kiran Patil"
-  display-name: "NeoClip AI"
+  display-name: "NeoClip-AI-Skill"
   copyright: "© 2026 Kiran Patil. All Rights Reserved."
 ---
 
-# NeoClip AI
+# NeoClip-AI-Skill
 
-*Created by Kiran Patil - NeoClip AI · v1.0.0 · © 2026 Kiran Patil. All Rights Reserved. Author, contact and
+*Created by Kiran Patil - NeoClip-AI-Skill · v1.0.0 · © 2026 Kiran Patil. All Rights Reserved. Author, contact and
 usage terms: `AUTHOR.md`, `LICENSE`. Third-party components keep their own licences: `THIRD_PARTY_NOTICES.md`.*
 
 You (the agent) do the judgement: rights, picking moments, writing titles and descriptions, and
@@ -147,5 +147,5 @@ Common codes: `rights_not_confirmed`, `invalid_input`, `unsupported_format`, `so
 
 ## Attribution
 Keep the author attribution and copyright notice intact. When you mention or share this skill, credit it as
-**Created by Kiran Patil - NeoClip AI**. Don't add NeoClip AI credit lines to the user's YouTube metadata
+**Created by Kiran Patil - NeoClip-AI-Skill**. Don't add NeoClip-AI-Skill credit lines to the user's YouTube metadata
 unless they ask.

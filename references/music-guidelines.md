@@ -6,7 +6,7 @@ except `storytelling-commentary` (which uses `auto`). In `auto` mode, a bed is o
 covers less than 35% of the clip, the clip contains no possible music already, and a verified track exists.
 
 ## Your licensed music library
-Create `~/.neoclip-ai/music_library.json` (or set `music_library` in `config.json`):
+Create `~/.neoclip-ai-skill/music_library.json` (or set `music_library` in `config.json`):
 ```json
 {"tracks": [{
   "path": "tracks/calm_piano.mp3",

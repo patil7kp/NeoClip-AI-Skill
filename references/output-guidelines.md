@@ -18,7 +18,7 @@ YouTube_Shorts/                 ← --output-root (default ./YouTube_Shorts)
   Make slugs specific: `boss_fight_clutch`, not `clip`.
 - Updates are block-level: an existing Short's entry is matched by filename and replaced in place, never duplicated.
 - Internal state (history, caches, temporary renders, risk reports, job files) lives in
-  `~/.neoclip-ai/`, never in the output.
+  `~/.neoclip-ai-skill/`, never in the output.
 
 ## YOUTUBE_METADATA.md entry format
 See `examples/example-metadata.md`. Each entry has: `## Short NN: Heading`, **Video File**, **Original Timestamp**,

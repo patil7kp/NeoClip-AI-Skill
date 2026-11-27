@@ -1,6 +1,6 @@
 # Workflow: timestamp management and duplicate prevention
 
-Storage: `~/.neoclip-ai/history/<video_id>.json` (schema `schemas/clip_history.schema.json`).
+Storage: `~/.neoclip-ai-skill/history/<video_id>.json` (schema `schemas/clip_history.schema.json`).
 
 ## Identity
 - YouTube: `yt-<11-char id>`. Watch, youtu.be, shorts and live links all map to the same id.

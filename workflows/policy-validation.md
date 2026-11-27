@@ -14,4 +14,4 @@
 4. **Metadata:** make sure each title and description matches the clip. Remove clickbait or misleading claims.
 5. **Wording:** "potential risk", "may be claimed", "could be age-restricted". Never "safe", "guaranteed",
    or "won't be claimed".
-6. Full risk JSON per clip: `~/.neoclip-ai/work/<video>/jobs/<job>/<clip_id>.risk.json`.
+6. Full risk JSON per clip: `~/.neoclip-ai-skill/work/<video>/jobs/<job>/<clip_id>.risk.json`.

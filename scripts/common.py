@@ -126,10 +126,10 @@ def run(cmd: Sequence[str], timeout: float | None = None, check: bool = True,
 def state_dir() -> Path:
     """Internal state lives OUTSIDE the user's output folders.
 
-    Override with YT_SHORTS_STATE_DIR. Default: ~/.neoclip-ai
+    Override with YT_SHORTS_STATE_DIR. Default: ~/.neoclip-ai-skill
     """
     base = os.environ.get("YT_SHORTS_STATE_DIR")
-    p = Path(base).expanduser() if base else Path.home() / ".neoclip-ai"
+    p = Path(base).expanduser() if base else Path.home() / ".neoclip-ai-skill"
     p.mkdir(parents=True, exist_ok=True)
     return p
 

@@ -1,6 +1,6 @@
 ## Author & Copyright Information
 
-**Project Name:** NeoClip AI
+**Project Name:** NeoClip-AI-Skill
 **Created & Developed By:** Kiran Patil
 **Role:** Software Engineer
 **Project Type:** AI Agent Skill – YouTube Shorts Automation
@@ -13,10 +13,10 @@
 
 ### Ownership & Attribution
 
-NeoClip AI is an independently developed AI Agent Skill designed for intelligent video clipping, automated
+NeoClip-AI-Skill is an independently developed AI Agent Skill designed for intelligent video clipping, automated
 YouTube Shorts creation, video editing, and publishing metadata generation.
 
-The original architecture, workflows, documentation, and custom templates developed for NeoClip AI are
+The original architecture, workflows, documentation, and custom templates developed for NeoClip-AI-Skill are
 attributed to Kiran Patil.
 
 ### Copyright Notice
@@ -33,7 +33,7 @@ Third-party libraries, AI models, tools, and dependencies remain subject to thei
 
 When sharing, distributing, or referencing this skill, provide the following attribution:
 
-**Created by Kiran Patil - NeoClip AI**
+**Created by Kiran Patil - NeoClip-AI-Skill**
 
 ### Important
 

@@ -2,7 +2,7 @@
 
 1. `inspect <input>`. Confirm it is valid. For YouTube, this reads metadata only (no download yet).
 2. Confirm rights. Then run `analyze <input> --rights … --template … --count N`.
-   - YouTube: downloads up to 2160p into `~/.neoclip-ai/work/yt-<id>/download/` (never the output folder).
+   - YouTube: downloads up to 2160p into `~/.neoclip-ai-skill/work/yt-<id>/download/` (never the output folder).
      Downloads are reused on later runs. `clean <input>` deletes the cache but keeps the history.
    - Local: the file is read in place. Nothing is copied.
 3. First analysis of a video: visual pass, then audio pass, then transcription. It's cached, so repeats are instant.

@@ -1,7 +1,7 @@
 # Third-party components
 
-NeoClip AI (© 2026 Kiran Patil) uses the components below. **None of them are owned by the NeoClip AI author.**
-Each remains under its own license and copyright. NeoClip AI does not bundle or redistribute them: they are
+NeoClip-AI-Skill (© 2026 Kiran Patil) uses the components below. **None of them are owned by the NeoClip-AI-Skill author.**
+Each remains under its own license and copyright. NeoClip-AI-Skill does not bundle or redistribute them: they are
 installed separately by the user (pip, a system package manager, or an explicit download command).
 Check each project's current license before redistributing anything.
 
@@ -25,7 +25,7 @@ Check each project's current license before redistributing anything.
 
 Other notes:
 - Music used through `music_library.json` belongs to its rights holders under the license the user records.
-- YouTube, Shorts and Content ID are trademarks or services of Google LLC. NeoClip AI is not affiliated with
+- YouTube, Shorts and Content ID are trademarks or services of Google LLC. NeoClip-AI-Skill is not affiliated with
   or endorsed by Google or YouTube.
 - AI agents that drive the skill (Claude, ChatGPT, Gemini, Cursor and others) are products of their respective
   owners.

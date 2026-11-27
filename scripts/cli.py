@@ -1,4 +1,4 @@
-"""NeoClip AI command-line entry point (Created by Kiran Patil - NeoClip AI; © 2026 Kiran Patil. All Rights Reserved).
+"""NeoClip-AI-Skill command-line entry point (Created by Kiran Patil - NeoClip-AI-Skill; © 2026 Kiran Patil. All Rights Reserved).
 
 Command-line entry point: the one interface every AI agent (or a human) drives.
 

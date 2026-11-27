@@ -1,10 +1,10 @@
 # Changelog
 
-NeoClip AI, created by Kiran Patil. © 2026 Kiran Patil. All Rights Reserved.
+NeoClip-AI-Skill, created by Kiran Patil. © 2026 Kiran Patil. All Rights Reserved.
 
 ## 1.0.0 (2026-11-27)
 First release.
-- Branded as **NeoClip AI** by Kiran Patil. Added `AUTHOR.md`, an all-rights-reserved `LICENSE` and
+- Branded as **NeoClip-AI-Skill** by Kiran Patil. Added `AUTHOR.md`, an all-rights-reserved `LICENSE` and
   `THIRD_PARTY_NOTICES.md`.
 - `SKILL.md` (Agent Skills format) with cross-agent entry points: `AGENTS.md`, `GEMINI.md`, a Cursor rule,
   and ChatGPT/Gemini planning-mode instructions.
