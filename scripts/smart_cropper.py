@@ -264,11 +264,32 @@ def _fit_rect_to_aspect(rect: list[float], aspect: float, src_w: int, src_h: int
 
 
 def _gaming_stack(src_w, src_h, out_w, out_h, cfg, visual, start, end, tmap, cuts, notes):
-    cam_ratio = _clamp(float(cfg.get("cam_ratio", 0.36)), 0.2, 0.45)  # gameplay always >= 55%
-    cam_h = _even(out_h * cam_ratio)
-    gp_h = out_h - cam_h
     cam = visual["facecam"]
-    cw, ch, cx, cy = _fit_rect_to_aspect(cam["rect"], out_w / cam_h, src_w, src_h, cam.get("face_center"))
+    # The WHOLE webcam goes into its panel (never cropped into): the panel height follows the cam's own
+    # shape, kept between 22% of the frame and the template's cam_ratio (at most 45%), so gameplay always
+    # keeps the majority.
+    r = list(cam["rect"])
+    # trim a hair off sides that border the game (not the frame edge), so no sliver of gameplay shows
+    tx, ty = r[2] * 0.012, r[3] * 0.012
+    if r[0] > 0.002:
+        r[0], r[2] = r[0] + tx, r[2] - tx
+    if r[0] + r[2] < 0.998:
+        r[2] -= tx
+    if r[1] > 0.002:
+        r[1], r[3] = r[1] + ty, r[3] - ty
+    if r[1] + r[3] < 0.998:
+        r[3] -= ty
+    cx = _even(_clamp(r[0] * src_w, 0, src_w - 2))
+    cy = _even(_clamp(r[1] * src_h, 0, src_h - 2))
+    cw = _even(_clamp(r[2] * src_w, 2, src_w - cx))
+    ch = _even(_clamp(r[3] * src_h, 2, src_h - cy))
+    max_share = _clamp(float(cfg.get("cam_ratio", 0.36)), 0.22, 0.45)
+    cam_h = _even(_clamp(out_w * ch / cw, out_h * 0.22, out_h * max_share))
+    gp_h = out_h - cam_h
+    fit = min(out_w / cw, cam_h / ch)
+    shown_h = ch * fit
+    if abs(shown_h - cam_h) > 4 or abs(cw * fit - out_w) > 4:
+        notes.append("Webcam shown whole with a soft blurred fill around it (its shape differs from the panel).")
     gp_aspect = out_w / gp_h
     zoom = float(cfg.get("gameplay_zoom", 1.0))
     gh = _even(min(src_h, src_h / zoom))
@@ -296,14 +317,14 @@ def _gaming_stack(src_w, src_h, out_w, out_h, cfg, visual, start, end, tmap, cut
     gy = int((src_h - gh) / 2)
     cam_top = cfg.get("cam_position", "top") == "top"
     seam = cam_h / out_h if cam_top else gp_h / out_h
-    cam_face_y = (cam["face_center"][1] * src_h - cy) / ch
-    cam_face_out = (cam_face_y * cam_h) / out_h if cam_top else (gp_h + cam_face_y * cam_h) / out_h
+    face_in_panel = (cam_h - shown_h) / 2 + (cam["face_center"][1] * src_h - cy) * fit
+    cam_face_out = face_in_panel / out_h if cam_top else (gp_h + face_in_panel) / out_h
     return {"mode": "gaming_stack", "notes": notes,
             "cam": {"w": cw, "h": ch, "x": cx, "y": cy, "panel_h": cam_h},
             "gameplay": {"w": gw, "h": gh, "x_expr": piecewise_expr(xk), "y": gy, "panel_h": gp_h,
                          "x_keyframes": xk},
             "cam_position": "top" if cam_top else "bottom",
-            "upscale_factor": round(max(gp_h / gh, cam_h / ch), 3),
+            "upscale_factor": round(max(gp_h / gh, fit), 3),
             "faces_out": [(round(cam_face_out - 0.05, 3), round(cam_face_out, 3), round(cam_face_out + 0.05, 3))],
             "seam_y": round(seam, 4), "zoom_panel": "gameplay", "zoom_center_y": 0.5}
 
@@ -327,8 +348,12 @@ def layout_filter(plan: dict, in_label: str, out_label: str, out_w: int, out_h: 
                 f"[fb_bg][fb_fg]overlay=(W-w)/2:(H-h)/2,fps={fps:g}{zp(out_w, out_h, 0.5)},setsar=1{out_label}")
     if plan["mode"] == "gaming_stack":
         c, g = plan["cam"], plan["gameplay"]
-        cam = (f"[gs_c]crop={c['w']}:{c['h']}:{c['x']}:{c['y']},scale={out_w}:{c['panel_h']}:{sc},"
-               f"fps={fps:g},setsar=1[gs_cam]")
+        ph = c["panel_h"]
+        cam = (f"[gs_c]crop={c['w']}:{c['h']}:{c['x']}:{c['y']},split=2[gs_cb][gs_cf];"
+               f"[gs_cb]scale={out_w}:{ph}:force_original_aspect_ratio=increase,crop={out_w}:{ph},"
+               f"gblur=sigma=30,eq=brightness=-0.1[gs_cbg];"
+               f"[gs_cf]scale={out_w}:{ph}:force_original_aspect_ratio=decrease:force_divisible_by=2:{sc}[gs_cfg];"
+               f"[gs_cbg][gs_cfg]overlay=(W-w)/2:(H-h)/2,fps={fps:g},setsar=1[gs_cam]")
         gp = (f"[gs_g]crop={g['w']}:{g['h']}:x='{g['x_expr']}':y={g['y']},scale={out_w}:{g['panel_h']}:{sc},"
               f"fps={fps:g}{zp(out_w, g['panel_h'], 0.5)},setsar=1[gs_gp]")
         order = "[gs_cam][gs_gp]" if plan["cam_position"] == "top" else "[gs_gp][gs_cam]"

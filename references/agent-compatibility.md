@@ -13,7 +13,7 @@ how the instructions get loaded and whether a shell is available.
 
 | Agent | How it loads the skill | Runs the engine? | Notes |
 |---|---|---|---|
-| **Claude Code** (CLI, desktop, web) | Native Agent Skills: copy the folder to `~/.claude/skills/neoclip-ai-skill/` (personal) or `.claude/skills/` (project) | Yes | Best supported. The skill triggers from its `description`. |
+| **Claude Code** (CLI, desktop, web) | Plugin (`/plugin install neoclip-ai-skill@neoclip-ai`) or native Agent Skills: copy the folder to `~/.claude/skills/neoclip-ai-skill/` (personal) or `.claude/skills/` (project) | Yes | Best supported. The skill triggers from its `description`. |
 | **Claude.ai / Claude desktop (Skills)** | Upload the folder as a skill (zip) in Settings → Capabilities → Skills | Only where code execution is enabled **and** FFmpeg is available | The hosted sandbox may lack network access for YouTube, or FFmpeg/libass. Local files are best. |
 | **OpenAI Codex CLI** | Reads `AGENTS.md`. Newer Codex versions also load `SKILL.md` skills from `~/.codex/skills/` | Yes | `AGENTS.md` points the agent at `SKILL.md`. |
 | **ChatGPT (web/app)** | Paste `platforms/chatgpt-instructions.md` into a Project or Custom GPT and attach `SKILL.md` + references | **Usually no.** The ChatGPT sandbox has no internet and its FFmpeg build is not guaranteed | Use ChatGPT for planning (it writes `plan.json`) and run the engine locally, or use the Codex CLI. |
@@ -37,6 +37,12 @@ FFmpeg must be installed separately. Use `brew install ffmpeg` (macOS), `winget 
 or `sudo apt install ffmpeg` (Debian/Ubuntu). The build must include libass. Standard builds do.
 
 ### Claude Code
+As a plugin (recommended), inside Claude Code:
+```text
+/plugin marketplace add patil7kp/NeoClip-AI-Skill
+/plugin install neoclip-ai-skill@neoclip-ai
+```
+Or as a plain skill folder:
 ```bash
 mkdir -p ~/.claude/skills && cp -r neoclip-ai-skill ~/.claude/skills/
 ```

@@ -38,6 +38,7 @@ For comedy, entertainment and unexpected moments.
   "transitions": {"fade_in": 0.0, "fade_out": 0.12, "audio_fade_in": 0.03, "audio_fade_out": 0.2},
   "hook": {"enabled": true, "duration": 2.0},
   "music": {"mode": "off", "volume_db": -22, "duck": true, "default_mood": "funny", "max_speech_coverage": 0.35},
+  "sfx": {"enabled": true, "kinds": ["laugh", "surprise", "hit"], "max_per_clip": 2, "gain_db": -17, "min_spike_z": 3.0},
   "metadata": {"base_hashtags": ["#funny", "#comedy"], "credit": true, "creator_hashtag": true}
 }
 ```

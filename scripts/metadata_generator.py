@@ -22,7 +22,9 @@ if __package__ in (None, ""):
 from scripts.common import atomic_write_text, fmt_ts, slugify
 
 METADATA_FILENAME = "YOUTUBE_METADATA.md"
-HEADER = "# YouTube Shorts Publishing Metadata\n"
+HEADER = ("# YouTube Shorts Metadata\n\n"
+          "Copy the Title and the Description of each Short straight into YouTube. "
+          "Publishing Notes are for you, not for the description.\n")
 STOPWORDS = set("""a an the and or but if then so to of in on at for with from by is are was were be been being it
 its this that these those i you he she we they me him her us them my your our their what which who whom
 whose when where why how all any both each few more most other some such no nor not only own same than too
@@ -44,7 +46,7 @@ def next_index(folder: Path) -> int:
     nums = [int(m.group(1)) for p in folder.glob("*.mp4") if (m := re.match(r"^(\d{2,3})_", p.name))]
     md = folder / METADATA_FILENAME
     if md.exists():
-        nums += [int(n) for n in re.findall(r"^## Short (\d+)", md.read_text(encoding="utf-8"), re.M)]
+        nums += [int(n) for n in re.findall(r"^## (\d{2,3})_", md.read_text(encoding="utf-8"), re.M)]
     return max(nums, default=0) + 1
 
 
@@ -92,13 +94,25 @@ def heuristic_title(clip: dict, source: dict) -> str:
 def heuristic_description(clip: dict, source: dict) -> str:
     excerpt = (clip.get("excerpt") or "").strip()
     what = (clip.get("label") or "moment").replace("_", " ")
-    src_title = source.get("title") or "the original video"
+    src_title = source.get("title") or "the full video"
+    who = source.get("creator")
     article = "An" if what[:1].lower() in "aeiou" else "A"
-    lines = [f"{article} {what} from “{src_title}” ({fmt_ts(clip['start'])}–{fmt_ts(clip['end'])} in the original)."]
+    owner = f"{who}'s video " if who else ""
+    lines = [f"{article} {what} from {owner}\u201c{src_title}\u201d."]
     if excerpt:
-        quote = excerpt[:280].rsplit(" ", 1)[0] + ("…" if len(excerpt) > 280 else "")
+        quote = excerpt[:400].rsplit(" ", 1)[0] + ("\u2026" if len(excerpt) > 400 else "")
         lines.append(f"What happens: {quote}")
     return "\n\n".join(lines)
+
+
+def topic_keywords(entry: dict, source: dict, limit: int = 10) -> list[str]:
+    """Natural related keywords: creator, video topic, tags and words from the moment (no stuffing)."""
+    out: list[str] = []
+    for k in ([source.get("creator")] + list(source.get("tags") or [])[:6] + list(source.get("categories") or [])[:2]
+              + keywords((entry.get("title") or "") + " " + (entry.get("excerpt") or ""), 5)):
+        if k and str(k).lower() not in [o.lower() for o in out]:
+            out.append(str(k))
+    return out[:limit]
 
 
 def build_hashtags(clip: dict, source: dict, template: dict, limit: int = 6) -> list[str]:
@@ -143,34 +157,28 @@ def timestamp_link(source: dict, start: float) -> str | None:
     return url
 
 
+def _plain(text: str) -> str:
+    """Title/description must paste cleanly into YouTube: no code-fence backticks inside."""
+    return text.replace("`", "'").strip()
+
+
 def render_entry(index: int, entry: dict) -> str:
-    """entry: filename, label, start, end, title, description, hashtags, creator, channel_url,
-    video_url, show_credit, notes(list[str])"""
-    heading = entry.get("heading") or entry["label"].replace("_", " ").title()
-    out = [f"## Short {index:02d}: {heading}", "",
-           f"**Video File:** {entry['filename']}", "",
-           f"**Original Timestamp:** {fmt_ts(entry['start'])} - {fmt_ts(entry['end'])}", "",
-           "### YouTube Title", entry["title"], "",
-           "### YouTube Description", entry["description"].strip(), ""]
-    if entry.get("show_credit"):
-        if entry.get("creator"):
-            out += [f"**Original Creator:** {entry['creator']}", ""]
-        if entry.get("channel_url"):
-            out += [f"**Channel:** {_link(entry['channel_url'])}", ""]
-        if entry.get("video_url"):
-            out += [f"**Original Video:** {_link(entry['video_url'])}", ""]
-    if entry.get("music_attribution"):
-        out += [f"**Music:** {entry['music_attribution']}", ""]
-    out += ["### Hashtags", " ".join(entry["hashtags"]), ""]
-    if entry.get("notes"):
-        out += ["### Publishing Notes"] + [f"- {n}" for n in entry["notes"]] + [""]
-    out += ["---", ""]
+    """One Short: filename heading, Title (copy block), Description (copy block), Publishing Notes."""
+    notes = [f"Original timestamp: {fmt_ts(entry['start'])} - {fmt_ts(entry['end'])}"] + list(entry.get("notes") or [])
+    out = [f"## {entry['filename']}", "",
+           "**Title**", "```text", _plain(entry["title"]), "```", "",
+           "**Description**", "```text", _plain(entry["description"]), "```", "",
+           "**Publishing Notes**"] + [f"- {n}" for n in notes] + ["", "---", ""]
     return "\n".join(out)
 
 
-def description_with_credit(desc: str, entry: dict) -> str:
-    """Viewer-facing description text: story + credit lines + hashtags, ready to paste."""
+def description_with_credit(desc: str, entry: dict, source: dict | None = None) -> str:
+    """Viewer-facing description, plain text: the story, related keywords, creator credit with plain
+    links, and the hashtags as the last line. Ready to paste into YouTube."""
     parts = [desc.strip()]
+    kws = topic_keywords(entry, source or {}) if source is not None else []
+    if kws:
+        parts.append("Related: " + ", ".join(kws))
     if entry.get("show_credit"):
         credit = []
         if entry.get("creator"):
@@ -193,8 +201,7 @@ def upsert_metadata(folder: Path, index: int, entry: dict) -> Path:
     if not text.startswith(HEADER):
         text = HEADER + "\n" + text
     block = render_entry(index, entry)
-    pattern = re.compile(rf"^## Short \d+:[^\n]*\n\n\*\*Video File:\*\* {re.escape(entry['filename'])}\n.*?^---\n\n?",
-                         re.M | re.S)
+    pattern = re.compile(rf"^## {re.escape(entry['filename'])}\n.*?^---\n\n?", re.M | re.S)
     if pattern.search(text):
         text = pattern.sub(lambda _: block, text, count=1)
     else:
@@ -210,8 +217,7 @@ def parse_metadata(md: Path) -> list[dict]:
     if not md.exists():
         return []
     entries = []
-    for m in re.finditer(r"^## Short (\d+): ([^\n]*)\n\n\*\*Video File:\*\* ([^\n]+)\n\n\*\*Original Timestamp:\*\* "
-                         r"([\d:]+) - ([\d:]+)", md.read_text(encoding="utf-8"), re.M):
-        entries.append({"index": int(m.group(1)), "heading": m.group(2), "filename": m.group(3),
-                        "start": m.group(4), "end": m.group(5)})
+    for m in re.finditer(r"^## ((\d+)_[^\n]+\.mp4)\n.*?^- Original timestamp: ([\d:]+) - ([\d:]+)",
+                         md.read_text(encoding="utf-8"), re.M | re.S):
+        entries.append({"index": int(m.group(2)), "filename": m.group(1), "start": m.group(3), "end": m.group(4)})
     return entries

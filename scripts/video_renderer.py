@@ -100,7 +100,8 @@ def _static(layout: dict) -> dict:
 
 def build_command(*, source_path: str, source_start: float = 0.0, meta: dict, edit: dict, layout: dict,
                   captions_path: str | None, out_path: Path, out_w: int, out_h: int, fps: float, cfg: dict,
-                  music: dict | None, profile: dict, graph_path: Path, encoder: str | None = None) -> list[str]:
+                  music: dict | None, profile: dict, graph_path: Path, encoder: str | None = None,
+                  sfx: list[dict] | None = None) -> list[str]:
     keeps = edit["keeps"]
     offset = max(0.0, keeps[0][0] - 1.0)
     span = keeps[-1][1] - offset + 0.5
@@ -127,8 +128,16 @@ def build_command(*, source_path: str, source_start: float = 0.0, meta: dict, ed
     if has_audio and music and music.get("used"):
         cmd += ["-stream_loop", "-1", "-i", music["track"]["path"]]
         music_idx = 1
+    # effects tied to a zoom are dropped when the fallback profile has no zooms
+    fx = [e for e in (sfx or []) if profile["zoom"]] if has_audio else []
+    fx_first = None
+    if fx:
+        fx_first = 1 + (1 if music_idx is not None else 0)
+        for e in fx:
+            cmd += ["-i", e["path"]]
     if has_audio:
-        parts.append(audio_filter(alab, "[aout]", dur, edit, cfg, music, music_idx))
+        parts.append(audio_filter(alab, "[aout]", dur, edit, cfg, music, music_idx, fx, fx_first,
+                                  float(cfg.get("_sfx_gain_db", -18.0))))
     atomic_write_text(graph_path, ";\n".join(parts))
     codec = encoder or cfg.get("video_codec", "libx264")
     preset = profile["preset"] or cfg.get("preset", "slow")
@@ -144,7 +153,7 @@ def build_command(*, source_path: str, source_start: float = 0.0, meta: dict, ed
 
 def render(*, source_path: str, source_start: float = 0.0, meta: dict, edit: dict, layout: dict, captions_path: str | None,
            tmp_dir: Path, out_w: int, out_h: int, cfg: dict, music: dict | None, profile: dict,
-           name: str) -> dict:
+           name: str, sfx: list[dict] | None = None) -> dict:
     fps = output_fps(meta.get("fps", 30), cfg.get("max_fps", 60))
     ensure_disk_space(tmp_dir, estimate_bytes(edit["output_duration"], out_w, out_h))
     out_path = tmp_dir / f"{name}.partial.mp4"
@@ -157,7 +166,7 @@ def render(*, source_path: str, source_start: float = 0.0, meta: dict, edit: dic
         cmd = build_command(source_path=source_path, source_start=source_start, meta=meta, edit=edit,
                             layout=layout, captions_path=captions_path, out_path=out_path, out_w=out_w,
                             out_h=out_h, fps=fps, cfg=cfg, music=music, profile=profile, graph_path=graph,
-                            encoder=enc)
+                            encoder=enc, sfx=sfx)
         log(f"Rendering {name} [{profile['name']}, {enc or cfg.get('video_codec', 'libx264')}] "
             f"{out_w}x{out_h}@{fps:g} ({edit['output_duration']:.1f}s) ...")
         t0 = time.time()

@@ -4,7 +4,7 @@ description: NeoClip-AI-Skill turns long videos (YouTube URL or local MP4/MOV/MK
 license: Proprietary. © 2026 Kiran Patil. All Rights Reserved. See LICENSE.
 compatibility: Needs Python 3.10+, FFmpeg (with libass) on PATH, and `pip install -r requirements.txt`. Shell access required. YouTube input also needs yt-dlp and network access.
 metadata:
-  version: "1.0.0"
+  version: "2.0.0"
   author: "Kiran Patil"
   display-name: "NeoClip-AI-Skill"
   copyright: "© 2026 Kiran Patil. All Rights Reserved."
@@ -12,7 +12,7 @@ metadata:
 
 # NeoClip-AI-Skill
 
-*Created by Kiran Patil - NeoClip-AI-Skill · v1.0.0 · © 2026 Kiran Patil. All Rights Reserved. Author, contact and
+*Created by Kiran Patil - NeoClip-AI-Skill · v2.0.0 · © 2026 Kiran Patil. All Rights Reserved. Author, contact and
 usage terms: `AUTHOR.md`, `LICENSE`. Third-party components keep their own licences: `THIRD_PARTY_NOTICES.md`.*
 
 You (the agent) do the judgement: rights, picking moments, writing titles and descriptions, and
@@ -37,6 +37,9 @@ ENGINE = python <skill_dir>/scripts/cli.py
    Titles must describe what actually happens in the clip.
 5. **Keep the output folder clean.** The engine writes only `NN_name.mp4` files and one `YOUTUBE_METADATA.md`
    to `YouTube_Shorts/YYYY-MM-DD/`. Don't add other files there.
+6. **Sound effects only when they fit, never copyrighted.** The engine adds a laugh, surprise or hit only on a
+   matching moment, from built-in effects or `~/NeoClip-SFX/cleared/`. Don't fetch sounds from websites, and
+   don't add effects the clip doesn't need.
 
 ## First run on a machine
 

@@ -4,10 +4,10 @@ The engine writes `YOUTUBE_METADATA.md` from the plan. The agent writes the word
 
 For each clip in the plan:
 - `slug`: 2 to 4 lowercase words naming the content (`clutch_1v3_ending`, `why_sleep_matters`).
-- `heading`: optional display name for the `## Short NN:` line (defaults to the slug in Title Case).
 - `title`: ≤ 70 characters, accurate, specific, engaging. Good: "He clutched a 1v3 with 2 HP left". Bad: "INSANE!!! (you won't believe)".
-- `description`: 2 to 4 sentences, the complete story (setup, what happens, the reaction or takeaway), with
-  natural keywords. Don't put credit or hashtags here, because the engine appends them.
+- `description`: 3 to 5 plain-text sentences that explain the whole Short (setup, what happens, the reaction or
+  takeaway), naming the creator, game or topic, with natural keywords. No Markdown. Don't put credit, related
+  keywords or hashtags here: the engine appends a `Related:` line, the creator credit and the hashtags (last line).
 - `hashtags`: 3 to 6 relevant tags, including `#shorts`.
 - `hook_text` (gaming and funny templates): ≤ 6 words, true to the clip.
 

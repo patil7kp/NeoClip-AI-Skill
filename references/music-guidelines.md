@@ -34,6 +34,15 @@ Allowed `license` values: `youtube-audio-library`, `cc0`, `cc-by` (attribution t
 - Original dialogue and sound effects are never removed or replaced.
 - Attribution text, when present, is added to the Short's description and to `YOUTUBE_METADATA.md`.
 
+## Sound effects
+- Added only when the clip's content calls for one: laughter (laugh), surprise or shock (surprise), a strong
+  reaction spike (hit). No match means no effect. Limits per template (`sfx` block), quiet (-17 to -18 dB).
+- Sources, in order: your files in `~/NeoClip-SFX/cleared/` (generic, cleared effects only, named by type),
+  otherwise the engine's built-in synthesised effects. Laugh needs a cleared file.
+- Never copyrighted sounds: file names mentioning movies, TV, songs, games or brands are skipped. Never
+  download sounds automatically from any site.
+- Every effect used is listed in the Short's Publishing Notes.
+
 ## Agent rules
 - Never download or suggest "trending" commercial songs for background use.
 - Never label a track "copyright-free" or "no copyright" unless its license was verified. Say "licensed under X" instead.

@@ -21,7 +21,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from scripts import (ai_bridge, audio_analyzer, caption_generator, clip_selector, metadata_generator,
-                     policy_checker, quality_validator, smart_cropper, source_input, transcription,
+                     policy_checker, quality_validator, smart_cropper, sound_effects, source_input, transcription,
                      video_analyzer, video_editor, video_renderer)
 import datetime as _dt
 
@@ -144,6 +144,7 @@ class Pipeline:
                     warnings.append(f"Transcription unavailable ({exc.message}). Shorts will have no captions; "
                                     f"{exc.hint}")
                     transcript = None
+        visual = video_analyzer.apply_facecam_override(visual, self.cfg.get("facecam"), meta["width"], meta["height"])
         analysis = {"visual": visual, "audio": audio, "transcript": transcript, "warnings": warnings}
         return analysis
 
@@ -445,6 +446,7 @@ class Pipeline:
                 visual = video_analyzer.shift_visual(
                     video_analyzer.analyze_visual(section_path, meta, cfg["analysis_fps"], cfg["face_detect_fps"]),
                     source_start)
+                visual = video_analyzer.apply_facecam_override(visual, cfg.get("facecam"), meta["width"], meta["height"])
             fps = video_renderer.output_fps(meta["fps"], cfg["max_fps"])
             edit = video_editor.plan_edit(clip, template, analysis["audio"], analysis["transcript"], fps)
             layout = smart_cropper.plan_layout(meta["width"], meta["height"], self.out_w, self.out_h,
@@ -474,6 +476,14 @@ class Pipeline:
                                 for m in (analysis["audio"] or {}).get("possible_music", []))
             music = audio_processor_decide(template, analysis["audio"], clip, speech_cov, cfg, music_overlap)
             base["warnings"] += music.get("warnings", [])
+            sfx = []
+            if meta.get("has_audio") and cfg.get("sfx", True):
+                try:
+                    sfx = sound_effects.resolve(sound_effects.plan_sfx(template, edit, analysis["audio"], clip),
+                                                cfg, clip_id)
+                except SkillError as exc:
+                    base["warnings"].append(f"Sound effects skipped ({exc.message}).")
+            sfx_gain = sound_effects.settings(template)["gain_db"]
             # metadata (agent/AI-provided or heuristic)
             meta_src = clip.get("metadata_source") or ("agent" if clip.get("title") else "heuristic")
             title = (clip.get("title") or metadata_generator.heuristic_title(clip, src)).strip()
@@ -488,7 +498,8 @@ class Pipeline:
                      "video_url": metadata_generator.timestamp_link(src, clip["start"]) if src.get("url") else None,
                      "show_credit": show_credit,
                      "music_attribution": music.get("attribution") if music.get("used") else None}
-            entry["description"] = metadata_generator.description_with_credit(story, entry)
+            entry["excerpt"] = clip.get("excerpt")
+            entry["description"] = metadata_generator.description_with_credit(story, entry, src)
             transformation = {"captions": bool(cap_info and cap_info["events"]), "vertical_reframe": True,
                               "pause_removal": edit["removed_seconds"] > 0.3,
                               "zoom_emphasis": bool(edit["zoom_events"]),
@@ -508,8 +519,9 @@ class Pipeline:
                 try:
                     rinfo = video_renderer.render(source_path=source_path, source_start=source_start, meta=meta, edit=edit, layout=layout,
                                                   captions_path=str(cap_path) if cap_path else None, tmp_dir=jdir,
-                                                  out_w=self.out_w, out_h=self.out_h, cfg=cfg, music=music,
-                                                  profile=profile, name=clip_id)
+                                                  out_w=self.out_w, out_h=self.out_h,
+                                                  cfg={**cfg, "_sfx_gain_db": sfx_gain}, music=music,
+                                                  profile=profile, name=clip_id, sfx=sfx)
                 except RenderError as exc:
                     attempts.append({"profile": profile["name"], "error": exc.message[-400:]})
                     continue
@@ -534,6 +546,10 @@ class Pipeline:
             os.replace(staging, dest)
             entry["filename"] = filename
             entry["notes"] = self._publishing_notes(risk, layout, edit)
+            used_fx = [e for e in sfx if final["profile"] == "full"]
+            if used_fx:
+                entry["notes"].append("Sound effects: " + "; ".join(
+                    f"{e['kind']} at {e['t']:.1f}s ({e['source']}: {e['name']})" for e in used_fx))
             metadata_generator.upsert_metadata(folder, index, entry)
             self.store.mark_completed(src["video_id"], clip_id, filename, str(dest), title=title,
                                       output_duration=edit["output_duration"], risk=risk["overall_risk"])
@@ -548,6 +564,8 @@ class Pipeline:
                                        f"{self.out_w}x{self.out_h} output but NOT native 4K detail."
                                        if upscaled else "Native resolution (no upscaling)."),
                    "music": {k: music[k] for k in ("used", "reason") if k in music},
+                   "sound_effects": [{k: e[k] for k in ("kind", "t", "why", "name", "source", "license")}
+                                     for e in sfx if final["profile"] == "full"],
                    "risk": {"overall": risk["overall_risk"],
                             "items": [f"[{r['level']}] {r['category']}: {r['detail']}" for r in risk["risks"]]},
                    "validation": {"passed": True, "warnings": validation["warnings"], "attempts": attempts},

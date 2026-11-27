@@ -100,22 +100,41 @@ def decide_music(template: dict, audio: dict | None, clip: dict, speech_coverage
 
 
 def audio_filter(in_label: str, out_label: str, duration: float, plan: dict, cfg: dict,
-                 music: dict | None, music_input_index: int | None) -> str:
+                 music: dict | None, music_input_index: int | None,
+                 sfx: list[dict] | None = None, sfx_first_index: int | None = None,
+                 sfx_gain_db: float = -18.0) -> str:
     fi, fo = plan["audio_fade_in"], plan["audio_fade_out"]
     chain = (f"{in_label}afade=t=in:d={fi:.3f},afade=t=out:st={max(0.0, duration - fo):.3f}:d={fo:.3f},"
              f"loudnorm=I={cfg['loudness_lufs']}:TP={cfg['true_peak_db']}:LRA=11,"
              f"aresample=48000,aformat=channel_layouts=stereo")
+    use_sfx = bool(sfx) and sfx_first_index is not None
+    mid = "[premix]" if use_sfx else out_label
     if not music or not music.get("used") or music_input_index is None:
-        return f"{chain}{out_label}"
-    vol = music["volume_db"]
-    m = (f"[{music_input_index}:a]atrim=0:{duration:.3f},asetpts=PTS-STARTPTS,aresample=48000,"
-         f"aformat=channel_layouts=stereo,volume={vol}dB,afade=t=in:d=0.6,"
-         f"afade=t=out:st={max(0.0, duration - 1.0):.3f}:d=1.0[mus]")
-    if music.get("duck", True):
-        return (f"{chain}[speech];[speech]asplit=2[sp_a][sp_b];{m};"
-                f"[mus][sp_a]sidechaincompress=threshold=0.02:ratio=10:attack=15:release=450[ducked];"
-                f"[sp_b][ducked]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.89{out_label}")
-    return f"{chain}[speech];{m};[speech][mus]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.89{out_label}"
+        graph = f"{chain}{mid}"
+    else:
+        vol = music["volume_db"]
+        m = (f"[{music_input_index}:a]atrim=0:{duration:.3f},asetpts=PTS-STARTPTS,aresample=48000,"
+             f"aformat=channel_layouts=stereo,volume={vol}dB,afade=t=in:d=0.6,"
+             f"afade=t=out:st={max(0.0, duration - 1.0):.3f}:d=1.0[mus]")
+        if music.get("duck", True):
+            graph = (f"{chain}[speech];[speech]asplit=2[sp_a][sp_b];{m};"
+                     f"[mus][sp_a]sidechaincompress=threshold=0.02:ratio=10:attack=15:release=450[ducked];"
+                     f"[sp_b][ducked]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.89{mid}")
+        else:
+            graph = (f"{chain}[speech];{m};[speech][mus]amix=inputs=2:duration=first:normalize=0,"
+                     f"alimiter=limit=0.89{mid}")
+    if not use_sfx:
+        return graph
+    parts = [graph]
+    labels = []
+    for k, e in enumerate(sfx):
+        ms = int(round(max(0.0, e["t"]) * 1000))
+        parts.append(f"[{sfx_first_index + k}:a]aresample=48000,aformat=channel_layouts=stereo,"
+                     f"volume={float(e.get('gain_db', sfx_gain_db)):.1f}dB,adelay={ms}|{ms}[fx{k}]")
+        labels.append(f"[fx{k}]")
+    parts.append(f"[premix]{''.join(labels)}amix=inputs={len(labels) + 1}:duration=first:normalize=0,"
+                 f"alimiter=limit=0.89{out_label}")
+    return ";".join(parts)
 
 
 def example_library() -> str:

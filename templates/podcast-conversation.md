@@ -42,6 +42,7 @@ For podcasts, interviews and discussions.
   "transitions": {"fade_in": 0.0, "fade_out": 0.2, "audio_fade_in": 0.05, "audio_fade_out": 0.3},
   "hook": {"enabled": false, "duration": 2.5},
   "music": {"mode": "off", "volume_db": -24, "duck": true, "default_mood": "calm", "max_speech_coverage": 0.35},
+  "sfx": {"enabled": false, "kinds": [], "max_per_clip": 0, "gain_db": -20, "min_spike_z": 3.5},
   "metadata": {"base_hashtags": ["#podcast"], "credit": true, "creator_hashtag": true}
 }
 ```

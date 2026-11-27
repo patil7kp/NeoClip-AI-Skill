@@ -1,8 +1,8 @@
-<p align="center"><img src="assets/banner-animated.webp" alt="NeoClip-AI-Skill banner" width="700"></p>
+<p align="center"><img src="assets/banner-animated.webp" alt="NeoClip-AI-Skill banner" width="500"></p>
 
 # NeoClip-AI-Skill
 
-**Created by Kiran Patil - NeoClip-AI-Skill** · v1.0.0 · © 2026 Kiran Patil. All Rights Reserved.
+**Created by Kiran Patil - NeoClip-AI-Skill** · v2.0.0 · © 2026 Kiran Patil. All Rights Reserved.
 
 A cross-agent AI skill that turns long videos (YouTube URLs or local files) into edited, captioned,
 9:16 YouTube Shorts. It also writes publishing metadata and remembers which parts of each video it has
@@ -16,24 +16,107 @@ already used, so it never makes the same Short twice.
   and one `YOUTUBE_METADATA.md` with titles, descriptions and hashtags.
 
 ## Features
-| | |
-|---|---|
-| Inputs | YouTube URL (rights-gated, via yt-dlp) or local MP4 / MOV / MKV / WebM / M4V / AVI |
-| Analysis | whole-video motion, scene cuts, faces, facecam detection, loudness spikes, silences, possible music, Whisper word timestamps |
-| Selection | template-weighted interest curve, sentence-snapped windows, hook and ending scoring, unused footage first |
-| Memory | persistent per-video timestamp history, crash-safe, duplicate prevention across sessions |
-| Templates | Gaming Reaction · Podcast & Conversation · Funny & Viral · Storytelling & Commentary · Minimal Professional |
-| Editing | pause removal (meaning-safe), restrained punch and push zooms, jump-cut treatment, hook text, fades |
-| Framing | face tracking with two-shots, action tracking, facecam + gameplay stack, blurred fit, no blind centre crops |
-| Captions | one standardized system, 4 presets, word highlight, safe zone, face and gameplay avoidance |
-| Policy | copyright, Content ID, reused/inauthentic content, age and ad-suitability lexicon, metadata checks, with official sources |
-| Music | licensed-only from your verified library, ducked under speech; otherwise the original audio is kept |
-| Render | single-pass FFmpeg up to 2160×3840, honest upscaling notes, automated QA, retry ladder |
-| Metadata | titles, full-story descriptions, creator credit with clickable links, hashtags, one Markdown file per date |
+
+**Inputs**
+- YouTube links (watch, youtu.be, Shorts, live) or local MP4, MOV, MKV, WebM, M4V and AVI files.
+- Rights check first: you say why you may use the video (own, permission, licensed, Creative Commons, public domain).
+
+**Long videos, fast (even 25-hour streams)**
+- YouTube videos are never downloaded in full. Audio is fetched in 1-hour batches, in parallel, then deleted.
+- Whisper transcribes the real audio. YouTube captions are not trusted by default.
+- Resumes where it stopped: finished batches are kept, so an interrupted run doesn't start over.
+- Only the chosen clips are downloaded at full quality, while earlier clips render.
+- `--range` to analyse only part of a video, `--workers` to set parallel downloads.
+
+**Finding the best moments**
+- Uses loudness spikes, laughter and reactions, motion, scene cuts, faces, cue words and YouTube's "most replayed" graph.
+- Clips start and end on full sentences, with a strong hook and a clean ending.
+- Each template weights these signals differently. The agent reviews the transcript excerpts before rendering.
+
+**Never the same Short twice**
+- Remembers every timestamp it has used, per video, across sessions.
+- `more` makes new Shorts only from footage not used yet. Crash-safe history.
+
+**5 editing templates**
+- Gaming Reaction, Podcast & Conversation, Funny & Viral, Storytelling & Commentary, Minimal Professional.
+- Your choice and your tweaks are remembered (`templates use`, `templates set`, `templates reset`).
+
+**Gaming reaction cam**
+- Finds the reaction cam automatically: a webcam, a cam with or without a border, or any picture-in-picture
+  overlay, even with no face in it.
+- The whole cam is shown on top, never cut off. The gameplay fills the rest.
+
+**Smart 9:16 framing**
+- Follows the speaker's face, keeps two people in frame together, follows the action.
+- Blurred-background fit when nothing can be cropped well. No blind centre crops.
+
+**Editing**
+- Removes dead pauses without changing what was said.
+- Gentle punch-in and push zooms, jump-cut treatment, hook text at the start, fades.
+
+**Captions**
+- Word-by-word captions synced to the speech, with the current word highlighted.
+- 4 styles: bold pop, clean pro, story, minimal. Kept in the safe zone, away from faces and the gameplay.
+- Word fixes for names and games (for example "valorent" to "Valorant").
+
+**Sound effects (only when needed)**
+- A laugh, a surprise boom or a soft hit, only on a matching moment. Nothing otherwise.
+- Built-in effects or your own cleared files. Never copyrighted sounds.
+
+**Music**
+- Only tracks from your own verified, licensed library, ducked under speech. Otherwise the original audio stays.
+
+**4K export**
+- 2160×3840 by default, `--1080p` for faster renders.
+- Hardware encoding on Mac (VideoToolbox) and NVIDIA (NVENC), with automatic fallback.
+- Says honestly when a video was upscaled.
+
+**Quality checks**
+- Every Short is checked after rendering (size, length, audio, black bars, frozen frames).
+- A failed render is retried with a safer setting.
+
+**Policy and copyright checks**
+- Flags possible copyright, Content ID, music, reused-content, age and advertiser-friendly risks, with links
+  to YouTube's rules. These are warnings, not guarantees.
+
+**YouTube metadata, ready to paste**
+- One `YOUTUBE_METADATA.md` per date. For each Short you get the filename, a Title, and a plain-text
+  Description with the story, related keywords, creator credit with links and hashtags last.
+- Publishing Notes for you: the original timestamp, the risk check and the sound effects used.
+
+**Clean output**
+- `YouTube_Shorts/YYYY-MM-DD/` holds only the `NN_name.mp4` Shorts and the metadata file.
+- Numbering continues across runs on the same day. Internal files stay out of sight.
+
+**Works with your AI agent**
+- Claude (Code and Skills), Codex CLI, Cursor, Gemini CLI, Copilot agent mode and any agent that runs commands.
+- ChatGPT and Gemini web apps can plan, and the engine runs on your computer.
+- Free and local. No paid AI API needed.
+
+**Handy commands**
+- `doctor` (checks your setup), `run`, `more`, `analyze`, `render`, `resume`, `history`, `clean`, `templates`.
 
 ## Installation
 
-### Quick install (recommended)
+### Claude Code plugin (easiest for Claude Code)
+
+In Claude Code, run these two commands:
+
+```text
+/plugin marketplace add patil7kp/NeoClip-AI-Skill
+/plugin install neoclip-ai-skill@neoclip-ai
+```
+
+On Claude Code 2.1.275 or later, this one line does both:
+
+```text
+/plugin install neoclip-ai-skill --marketplace patil7kp/NeoClip-AI-Skill
+```
+
+Then install the tools it uses once (FFmpeg and the Python requirements), as in [Manual install](#manual-install),
+or just ask Claude: "Set up NeoClip-AI-Skill and run its doctor check." Update later with `/plugin update`.
+
+### Quick install (any agent)
 
 Open an AI agent that can use your terminal (Claude Code, Codex CLI, Gemini CLI, Cursor or GitHub Copilot)
 and send it this prompt:
@@ -141,7 +224,31 @@ python scripts/cli.py templates use gaming-reaction
 python scripts/cli.py templates set gaming-reaction captions.uppercase=false
 python scripts/cli.py templates reset gaming-reaction
 ```
-Speed: `--resolution 1080x1920` renders about 4× faster than the 4K default.
+Quality: Shorts export in **4K (2160×3840)** by default. Add `--1080p` for a 1080×1920 export that renders about
+4× faster. If the source is smaller than 4K, the result says it was upscaled.
+
+## Gaming reaction videos
+The `gaming-reaction` template finds the reaction cam on its own. It works with a normal webcam, a cam with a
+border, a cam in a corner, and any picture-in-picture reaction overlay, even when no face is visible. The whole
+cam is shown in the top panel (never cut off) and the gameplay fills the rest.
+
+## Sound effects
+Sound effects are added only when a moment really calls for one, and skipped otherwise:
+- laughter → a laugh, a surprise or shock → a short boom, a big reaction spike → a soft hit.
+- At most 1 or 2 per Short, quiet, under the original audio. Podcast and minimal templates use none.
+- By default the engine uses its own built-in effects (made with FFmpeg, no copyright).
+- To use your own sounds, put **generic, cleared** files in `~/NeoClip-SFX/cleared/` and name them by type
+  (`laugh_1.mp3`, `boom.wav`, `hit_soft.mp3`). You can browse [Myinstants](https://www.myinstants.com/en/index/in/)
+  yourself and save only generic, royalty-free effects there. The engine never downloads sounds by itself
+  (the site's terms don't allow automated access).
+- **No copyrighted sounds.** Files whose name points to a movie, TV show, song, game or brand are skipped.
+  When in doubt, the engine uses a built-in effect or none. Every sound used is listed in the Short's
+  Publishing Notes.
+
+## YOUTUBE_METADATA.md
+Made for copy and paste. Each Short has only its filename, a **Title** box, a **Description** box (plain text:
+the full story, related keywords, creator credit with links, hashtags on the last line) and **Publishing Notes**
+for you (timestamp, risk check, sound effects used). See [the example](examples/example-metadata.md).
 
 ## Long YouTube videos (fast mode)
 
@@ -195,7 +302,7 @@ Environment: `YT_SHORTS_STATE_DIR`, `YT_SHORTS_OUTPUT_ROOT`, `YT_SHORTS_RESOLUTI
 
 ## Tests
 ```bash
-python -m pytest -q      # 76 tests, about 1 minute, needs FFmpeg
+python -m pytest -q      # 80 tests, about 1 minute, needs FFmpeg
 ```
 
 ## Honest limitations
@@ -223,7 +330,7 @@ monetization or reach. YouTube makes those decisions.
 **Created & Developed By:** Kiran Patil
 **Role:** Software Engineer
 **Project Type:** AI Agent Skill – YouTube Shorts Automation
-**Version:** 1.0.0
+**Version:** 2.0.0
 **Copyright:** © 2026 Kiran Patil. All Rights Reserved.
 
 ### Contact Information

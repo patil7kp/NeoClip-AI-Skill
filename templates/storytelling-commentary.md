@@ -39,6 +39,7 @@ For storytelling, commentary and explanatory videos.
   "transitions": {"fade_in": 0.0, "fade_out": 0.25, "audio_fade_in": 0.05, "audio_fade_out": 0.35},
   "hook": {"enabled": false, "duration": 2.5},
   "music": {"mode": "auto", "volume_db": -24, "duck": true, "default_mood": "cinematic", "max_speech_coverage": 0.35},
+  "sfx": {"enabled": true, "kinds": ["surprise"], "max_per_clip": 1, "gain_db": -20, "min_spike_z": 3.5},
   "metadata": {"base_hashtags": ["#storytime"], "credit": true, "creator_hashtag": true}
 }
 ```

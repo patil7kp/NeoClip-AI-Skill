@@ -101,3 +101,38 @@ def test_moving_or_central_face_is_not_a_facecam():
     assert detect_facecam(_faces((0.5, 0.45), size=0.15), 20) is None          # big, central
     assert detect_facecam(_faces((0.1, 0.8), jitter=0.15), 20) is None        # moving
     assert detect_facecam(_faces((0.1, 0.8), n=4), 20) is None                 # rarely present
+
+
+def _overlay_video(path, inset):
+    """1920x1080 gameplay-like background (game of life) with an optional picture-in-picture overlay."""
+    import subprocess
+    bg = "life=s=960x540:mold=10:r=30:ratio=0.08:death_color=#203040:life_color=#ff8040"
+    cmd = ["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", bg]
+    if inset:
+        x, y, w, h = inset
+        cmd += ["-f", "lavfi", "-i", "mandelbrot=s=640x360:r=30", "-filter_complex",
+                f"[0:v]scale=1920:1080,setsar=1[g];[1:v]scale={w}:{h},setsar=1,drawbox=0:0:{w}:{h}:white:6[i];"
+                f"[g][i]overlay={x}:{y}:shortest=1[v]", "-map", "[v]"]
+    else:
+        cmd += ["-vf", "scale=1920:1080,setsar=1"]
+    subprocess.run(cmd + ["-t", "12", "-c:v", "libx264", "-preset", "ultrafast", str(path)], check=True)
+    return path
+
+
+def _iou(a, b):
+    ix = max(0, min(a[0] + a[2], b[0] + b[2]) - max(a[0], b[0]))
+    iy = max(0, min(a[1] + a[3], b[1] + b[3]) - max(a[1], b[1]))
+    inter = ix * iy
+    return inter / (a[2] * a[3] + b[2] * b[3] - inter)
+
+
+def test_reaction_overlay_without_a_face_is_found_whole(tmp_path):
+    p = _overlay_video(tmp_path / "pip.mp4", (1380, 40, 500, 282))
+    cam = analyze_visual(p, probe(p), 2.0, 1.0)["facecam"]
+    assert cam, "picture-in-picture overlay not detected"
+    assert _iou(cam["rect"], [1380 / 1920, 40 / 1080, 500 / 1920, 282 / 1080]) > 0.85
+
+
+def test_plain_gameplay_has_no_overlay(tmp_path):
+    p = _overlay_video(tmp_path / "plain.mp4", None)
+    assert analyze_visual(p, probe(p), 2.0, 1.0)["facecam"] is None

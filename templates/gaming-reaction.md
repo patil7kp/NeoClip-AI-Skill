@@ -46,6 +46,7 @@ For gaming videos, livestreams and streamer reactions.
   "transitions": {"fade_in": 0.0, "fade_out": 0.15, "audio_fade_in": 0.04, "audio_fade_out": 0.25},
   "hook": {"enabled": true, "duration": 2.2},
   "music": {"mode": "off", "volume_db": -22, "duck": true, "default_mood": "energetic", "max_speech_coverage": 0.35},
+  "sfx": {"enabled": true, "kinds": ["hit", "surprise", "laugh"], "max_per_clip": 2, "gain_db": -18, "min_spike_z": 3.0},
   "metadata": {"base_hashtags": ["#gaming", "#gameplay"], "credit": true, "creator_hashtag": true}
 }
 ```

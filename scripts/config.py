@@ -33,7 +33,10 @@ DEFAULTS: dict[str, Any] = {
     "whisper_beam_size": 5,                # 1 is ~2x faster with slightly lower accuracy
     "youtube_captions": False,             # True = use YouTube's own captions instead of Whisper (not default)
     "hw_encoder": "auto",                  # auto (VideoToolbox / NVENC if present, else x264) | off
-    "exact_section_cuts": False,           # True = re-encode clip sections at exact cut points (slower)
+    "exact_section_cuts": False,
+    "facecam": None,
+    "sfx": True,                           # sound effects where the template asks for them (False = never)
+    "sfx_library": "~/NeoClip-SFX",        # optional: only <this>/cleared/ is used (sounds you checked are free)                       # None = auto-detect | "none" | [x, y, w, h] in source pixels           # True = re-encode clip sections at exact cut points (slower)
     "download_max_height": 2160,
     "youtube_mode": "fast",                # fast: captions + audio chunks + clip sections only | full: whole video
     "audio_chunk_minutes": 60,             # fast mode: audio is fetched, analysed and deleted chunk by chunk

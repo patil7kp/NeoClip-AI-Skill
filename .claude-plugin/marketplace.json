@@ -1,0 +1,17 @@
+{
+  "name": "neoclip-ai",
+  "description": "NeoClip-AI-Skill by Kiran Patil: turn long videos into ready-to-post YouTube Shorts.",
+  "owner": {
+    "name": "Kiran Patil",
+    "url": "https://github.com/patil7kp"
+  },
+  "plugins": [
+    {
+      "name": "neoclip-ai-skill",
+      "source": "./",
+      "description": "Turn long videos into edited 9:16 YouTube Shorts with reaction-cam layouts, captions, 4K export and copy-paste metadata.",
+      "category": "media",
+      "tags": ["youtube", "shorts", "video"]
+    }
+  ]
+}

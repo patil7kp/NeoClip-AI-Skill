@@ -63,6 +63,9 @@ def _common(p: argparse.ArgumentParser, needs_rights: bool = True) -> None:
     p.add_argument("--youtube-captions", action="store_true",
                    help="YouTube: use the video's own captions instead of Whisper")
     p.add_argument("--workers", type=int, help="parallel downloads (default 3)")
+    # advanced fallback only; the webcam/reaction overlay is found automatically
+    p.add_argument("--facecam", metavar="X,Y,W,H|none", help=argparse.SUPPRESS)
+    p.add_argument("--1080p", dest="hd", action="store_true", help="export 1080x1920 (faster) instead of 4K")
 
 
 def _parse_range(value: str | None) -> list[str] | None:
@@ -74,7 +77,8 @@ def _parse_range(value: str | None) -> list[str] | None:
 
 
 def _overrides(a) -> dict:
-    return {"resolution": getattr(a, "resolution", None), "output_root": getattr(a, "output_root", None),
+    return {"resolution": getattr(a, "resolution", None) or ("1080x1920" if getattr(a, "hd", False) else None),
+            "facecam": getattr(a, "facecam", None), "output_root": getattr(a, "output_root", None),
             "whisper_model": getattr(a, "whisper_model", None), "language": getattr(a, "language", None),
             "analyze_range": _parse_range(getattr(a, "analyze_range", None)),
             "transcribe_scope": getattr(a, "transcribe", None),

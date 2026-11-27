@@ -21,10 +21,10 @@ YouTube_Shorts/                 ← --output-root (default ./YouTube_Shorts)
   `~/.neoclip-ai-skill/`, never in the output.
 
 ## YOUTUBE_METADATA.md entry format
-See `examples/example-metadata.md`. Each entry has: `## Short NN: Heading`, **Video File**, **Original Timestamp**,
-`### YouTube Title`, `### YouTube Description` (paste-ready: story, credit lines, links, hashtags),
-**Original Creator**, **Channel** (clickable), **Original Video** (clickable, with `&t=`), `### Hashtags`, and
-`### Publishing Notes` (risk summary and upscaling notice, for the uploader; not for the description).
+See `examples/example-metadata.md`. The file is built for copy-paste into YouTube. Each Short has only:
+the filename as its heading (`## 01_slug.mp4`), **Title** in a copy block, **Description** in a copy block (plain
+text, no Markdown: the full story, a `Related:` keyword line, creator credit with plain URLs, hashtags as the last
+line), and **Publishing Notes** for the uploader (original timestamp, risk summary, sound effects used, upscaling).
 Credit lines appear only when the source is known and attribution is appropriate.
 
 ## Writing titles and descriptions (agent)

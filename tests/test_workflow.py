@@ -42,8 +42,12 @@ def test_full_run_then_more_without_duplicates(media, small_cfg):
     entries = parse_metadata(Path(small_cfg["output_root"]) / "2026-11-27" / METADATA_FILENAME)
     assert [e["index"] for e in entries] == [1, 2, 3]
     md = (Path(small_cfg["output_root"]) / "2026-11-27" / METADATA_FILENAME).read_text()
-    assert md.count("# YouTube Shorts Publishing Metadata") == 1
-    assert "### YouTube Title" in md and "### Hashtags" in md and "#shorts" in md
+    assert md.count("# YouTube Shorts Metadata") == 1
+    assert "**Title**" in md and "**Description**" in md and "**Publishing Notes**" in md and "#shorts" in md
+    # copy-paste friendly: no markdown links or headings inside the description blocks
+    for block in md.split("**Description**\n```text\n")[1:]:
+        desc = block.split("\n```", 1)[0]
+        assert "](" not in desc and "**" not in desc and desc.strip().splitlines()[-1].startswith("#")
     # history: three completed, all used, nothing tracking-related in output
     store = HistoryStore()
     rec = store.load(r1["video_id"])
@@ -103,8 +107,8 @@ def test_agent_plan_render(media, small_cfg, tmp_path):
     c = r["clips"][0]
     assert c["filename"] == "01_why_people_get_it_wrong.mp4" and c["metadata_source"] == "agent"
     md = Path(r["metadata_file"]).read_text()
-    assert "**Original Creator:** Demo Creator" in md
-    assert "[https://www.youtube.com/@demo](https://www.youtube.com/@demo)" in md
+    assert "Original creator: Demo Creator" in md
+    assert "Channel: https://www.youtube.com/@demo" in md
     assert "watch?v=dQw4w9WgXcQ&t=30s" in md
     # rerunning the same plan is blocked as a duplicate
     p.write_text(json.dumps({**plan, "date": "2026-11-28"}))
@@ -141,7 +145,7 @@ def test_metadata_upsert_replaces_own_block(tmp_path):
     upsert_metadata(tmp_path, 1, entry)
     upsert_metadata(tmp_path, 1, dict(entry, title="T2"))
     text = (tmp_path / METADATA_FILENAME).read_text()
-    assert text.count("## Short 01") == 1 and "T2" in text and "T1" not in text
+    assert text.count("## 01_best_reaction.mp4") == 1 and "T2" in text and "T1" not in text
     assert "00:12:30 - 00:13:15" in text
 
 
@@ -211,7 +215,7 @@ def test_youtube_url_flow_offline(media, small_cfg, tmp_path, monkeypatch):
                           subtitles=str(media["srt"]), use_ai=False, date="2026-11-27")
     assert r["status"] == "completed" and r["video_id"] == "yt-dQw4w9WgXcQ"
     md = Path(r["metadata_file"]).read_text()
-    assert "**Original Creator:** Demo Channel" in md and "watch?v=dQw4w9WgXcQ&t=" in md
+    assert "Original creator: Demo Channel" in md and "watch?v=dQw4w9WgXcQ&t=" in md
     assert any("reused_content" in i for i in r["clips"][0]["risk"]["items"])
     # the download lives in internal state, never next to the Shorts
     assert not any(p.name.startswith("source") for p in Path(small_cfg["output_root"]).rglob("*"))
@@ -367,3 +371,34 @@ def test_cli_fast_mode_flags(media, tmp_path, monkeypatch, capsys):
     out = json.loads(capsys.readouterr().out)
     assert code == 0 and out["analysis_mode"] == "fast"
     assert all(c["start"] >= 59 for c in out["candidates"])
+
+
+def test_sound_effects_only_on_matching_moments(media, small_cfg, tmp_path):
+    from scripts.templates_config import load_template
+    r = pipeline.run_auto(str(media["talk"]), "own", template_id="gaming-reaction", count=1,
+                          cfg_overrides=dict(small_cfg, sfx_library=str(tmp_path / "none")),
+                          subtitles=str(media["srt"]), use_ai=False, date="2026-11-27")
+    assert r["status"] == "completed"
+    fx = r["clips"][0]["sound_effects"]
+    assert len(fx) <= 2 and all(e["source"].startswith("built-in") for e in fx)
+    assert all(e["kind"] in ("hit", "surprise") for e in fx)  # no laugh without a cleared file
+    if fx:
+        assert "Sound effects:" in Path(r["metadata_file"]).read_text()
+    # templates that should stay clean never get effects
+    from scripts.sound_effects import plan_sfx
+    for tid in ("minimal-professional", "podcast-conversation"):
+        assert plan_sfx(load_template(tid), {"zoom_events": [{"t": 2.0, "reason": "surprise"}]}, None,
+                        {"start": 0, "end": 30}) == []
+
+
+def test_sound_library_uses_only_cleared_generic_sounds(tmp_path):
+    from scripts.sound_effects import blocked, library_files
+    lib = tmp_path / "sfx"
+    (lib / "cleared" / "laugh").mkdir(parents=True)
+    (lib / "laugh").mkdir(parents=True)
+    (lib / "cleared" / "laugh" / "generic-laugh.mp3").write_bytes(b"x")
+    (lib / "cleared" / "laugh" / "spongebob-laugh.mp3").write_bytes(b"x")
+    (lib / "laugh" / "uncleared-laugh.mp3").write_bytes(b"x")
+    names = [p.name for p in library_files(str(lib), "laugh")]
+    assert names == ["generic-laugh.mp3"]
+    assert blocked("movie_quote_wow") and blocked("Fortnite-win") and not blocked("deep-boom")
