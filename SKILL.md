@@ -1,10 +1,10 @@
 ---
 name: neoclip-ai-skill
-description: NeoClip-AI-Skill turns long videos (YouTube URL or local MP4/MOV/MKV/WebM) into edited 9:16 YouTube Shorts with smart cropping, gaming facecam layouts, synced captions, policy/copyright risk checks and a YOUTUBE_METADATA.md per date. Remembers used timestamps across sessions so repeat runs never duplicate clips. Use when the user wants Shorts/clips/highlights cut from a video, more Shorts from a video processed before, or to pick/customize a Shorts editing template.
+description: NeoClip-AI-Skill turns long videos (YouTube URL or local MP4/MOV/MKV/WebM) into edited 9:16 YouTube Shorts with smart cropping, gaming reaction layouts, synced captions, policy/copyright risk checks and a YOUTUBE_METADATA.md per date. Remembers used timestamps across sessions so repeat runs never duplicate clips. Use when the user wants Shorts/clips/highlights cut from a video, more Shorts from a video processed before, or to pick/customize a Shorts editing template.
 license: Proprietary. © 2026 Kiran Patil. All Rights Reserved. See LICENSE.
 compatibility: Needs Python 3.10+, FFmpeg (with libass) on PATH, and `pip install -r requirements.txt`. Shell access required. YouTube input also needs yt-dlp and network access.
 metadata:
-  version: "2.0.0"
+  version: "2.1.0"
   author: "Kiran Patil"
   display-name: "NeoClip-AI-Skill"
   copyright: "© 2026 Kiran Patil. All Rights Reserved."
@@ -12,10 +12,10 @@ metadata:
 
 # NeoClip-AI-Skill
 
-*Created by Kiran Patil - NeoClip-AI-Skill · v2.0.0 · © 2026 Kiran Patil. All Rights Reserved. Author, contact and
+*Created by Kiran Patil - NeoClip-AI-Skill · v2.1.0 · © 2026 Kiran Patil. All Rights Reserved. Author, contact and
 usage terms: `AUTHOR.md`, `LICENSE`. Third-party components keep their own licences: `THIRD_PARTY_NOTICES.md`.*
 
-You (the agent) do the judgement: rights, picking moments, writing titles and descriptions, and
+You (the agent) do the judgement: picking moments, writing titles and descriptions, and
 explaining risks. A local Python engine does all video work (FFmpeg + OpenCV + Whisper), so the
 same results come out whichever AI agent drives it. Every command prints one JSON document.
 
@@ -25,10 +25,11 @@ ENGINE = python <skill_dir>/scripts/cli.py
 
 ## Non-negotiable rules
 
-1. **Rights first.** Never process a video until the user has told you their basis for using it:
-   `own`, `permission`, `licensed`, `creative-commons` or `public-domain`. Giving credit is NOT
-   permission, and short clips are NOT automatically allowed. If the user has no rights, stop and
-   explain why. Never help bypass private, members-only, age-gated or DRM-protected content.
+1. **Don't ask, start.** When the user sends a YouTube link or a video file, start working right away. Don't
+   ask about rights, templates, counts or the reaction overlay. Use what the user said in the same message,
+   otherwise the defaults below. The user is responsible for having the rights to the video (stated in the
+   README); the copyright risk notes stay in each Short's Publishing Notes. Never bypass private,
+   members-only, age-gated or DRM-protected content.
 2. **Be honest about results.** Report only what the JSON says. A clip with `"status": "failed"` is
    failed. If the output is upscaled, it is not native 4K, so say that plainly.
 3. **No guarantees.** Policy output lists *potential risks*, not verdicts. Never promise copyright safety,
@@ -52,19 +53,26 @@ If `doctor` shows that something is missing, tell the user exactly what to insta
 
 ## Workflow (follow in order)
 
-**1. Understand the request.** Get the URL or file path, how many Shorts (default **3**), and the template.
-If the user doesn't name a template, run `templates list`. The remembered one is marked `current`. Otherwise
-suggest one from the content (see the table below) and confirm.
+**Hour by hour (default, every input).** Long videos are handled one hour at a time: each run transcribes and
+analyses only the next unprocessed hour (audio in 1-hour batches, never the whole video at once), makes 3
+Shorts from it, saves them, and records that hour in history. The next request ("more Shorts") moves on to the
+following hour automatically. `--hours N` handles N hours in one run; `--range START-END` picks a part by hand.
+The result's `window` says which part was used and which comes next. Tell the user, for example: "Done with
+0:00-1:00. Ask for more and I'll do 1:00-2:00."
 
-**2. Inspect + rights.** `ENGINE inspect <input>` validates the input. It also shows the title, duration, and
-`history` (for a video processed before: what was already used). Ask about rights if you don't know them yet.
+**1. Read the request, no questions.** Take the URL or file path. Count: what the user said, else **3**.
+Template: what the user named, else pick one from the title and content (table below), else the remembered
+one (`templates list` marks it `current`). Output is 4K by default. Everything else is automatic.
+
+**2. Inspect.** `ENGINE inspect <input>` validates the input. It also shows the title, duration, and
+`history` (for a video processed before: what was already used).
 
 **3. Analyze.**
 ```bash
-ENGINE analyze "<input>" --rights <basis> --template <id> --count 3 [--creator "Name" --channel-url URL --source-url URL]
+ENGINE analyze "<input>" --template <id> --count 3 [--creator "Name" --channel-url URL --source-url URL]
 ```
 This returns ranked `candidates` taken from **unused** footage only. Each has `start`/`end`, `score`, `reasons`,
-`category` and a transcript `excerpt`. It also returns `previously_completed`, `content_hint` and `facecam_detected`.
+`category` and a transcript `excerpt`. It also returns `previously_completed`, `content_hint` and `reaction_overlay_detected`.
 
 **4. Choose and write the plan.** Read the excerpts. Pick the best N moments. Each one needs a strong
 opening, a clear central event, a payoff and an ending, and it must make sense without the full video.
@@ -86,12 +94,12 @@ clips with their `error`/`hint`, and what remains unused. If `policy_review_due`
 plans to monetize, check the official pages listed in `references/youtube-policies.md` before you give
 publishing advice.
 
-**Fast path (no review):** `ENGINE run "<input>" --rights <basis> --template <id> --count 3` selects,
+**Fast path (no review):** `ENGINE run "<input>" --template <id> --count 3` selects,
 renders and writes heuristic metadata in one go. Prefer the analyze → plan → render path when you can,
 because your titles and descriptions will be much better.
 
-**More Shorts from the same video:** `ENGINE more "<input>" --rights <basis> --count 2` (or analyze plus
-render again). History makes the engine skip used footage automatically. Never pass an already-used
+**More Shorts from the same video:** `ENGINE more "<input>"` (or analyze plus render again). It continues
+with the next unprocessed hour, and history makes the engine skip used footage automatically. Never pass an already-used
 range unless the user wants it. In that case, add `"overlap_reason"` to that clip.
 
 **Interrupted run:** `ENGINE resume`. Completed clips are kept and the rest are retried.
@@ -100,7 +108,7 @@ range unless the user wants it. In that case, add `"overlap_reason"` to that cli
 
 | Content | Template id | Layout |
 |---|---|---|
-| Gameplay or streams with a facecam | `gaming-reaction` | facecam on top, gameplay ≥ 55% below, captions on the seam |
+| Gameplay or streams with a reaction overlay | `gaming-reaction` | reaction overlay on top, gameplay ≥ 55% below, captions on the seam |
 | Podcasts, interviews, panels | `podcast-conversation` | face tracking, two-shot when it fits, pause removal |
 | Comedy, pranks, reactions, viral moments | `funny-viral-moments` | fast opening, punch-in zooms, word-pop captions |
 | Storytime, commentary, explainers | `storytelling-commentary` | longer windows, beginning, middle and end |
@@ -135,8 +143,8 @@ original audio is kept. Never call a track copyright-free unless the user has ve
 ## Errors
 
 Errors come back as `{"status":"error","error":code,"message":...,"hint":...}`. Relay the hint.
-Common codes: `rights_not_confirmed`, `invalid_input`, `unsupported_format`, `source_unavailable`
-(private, removed, age-gated or region-blocked, so ask for a local file the user has rights to),
+Common codes: `invalid_input`, `unsupported_format`, `source_unavailable`
+(private, removed, age-gated or region-blocked, so ask for a local copy of the video),
 `missing_dependency`, `transcription_failed` (the run continues without captions and warns),
 `insufficient_disk_space`, `render_failed`/`validation_failed` (per clip; other clips continue).
 

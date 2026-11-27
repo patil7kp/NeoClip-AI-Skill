@@ -23,7 +23,9 @@ RIGHTS_VALUES = {
     "licensed": "You hold a license that covers editing and republishing.",
     "creative-commons": "The video is CC-BY (or similar) and you will follow its attribution terms.",
     "public-domain": "The work is in the public domain.",
+    "user-responsible": "Not stated. The user is responsible for having the rights (default).",
 }
+DEFAULT_RIGHTS = "user-responsible"
 _YT_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com",
              "youtu.be", "www.youtube-nocookie.com", "youtube-nocookie.com"}
 _ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
@@ -31,11 +33,10 @@ _ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 
 # --------------------------------------------------------------------------- rights
 def check_rights(rights: str | None) -> str:
+    """No question is asked: without a value the user is responsible for having the rights, and the
+    copyright risk notes in Publishing Notes stay on."""
     if not rights:
-        raise RightsError(
-            "Usage rights were not confirmed.",
-            "Ask the user whether they own the video or have permission, then pass "
-            f"--rights one of: {', '.join(sorted(RIGHTS_VALUES))}. Credit alone is not permission.")
+        return DEFAULT_RIGHTS
     rights = rights.strip().lower()
     if rights not in RIGHTS_VALUES:
         raise RightsError(f"Unknown rights value '{rights}'.",
@@ -222,6 +223,34 @@ def download_youtube_audio_section(source: dict, dest_dir: Path, start: float, e
     if not files:
         raise SourceUnavailableError("Audio download finished but no file was produced.")
     return files[0]
+
+
+def local_audio_section(path: str, dest_dir: Path, start: float, end: float) -> Path:
+    """Audio for [start, end] of a local file only (16 kHz mono FLAC), so long files are handled in batches."""
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    out = dest_dir / f"audio_{start:.0f}_{end:.0f}.flac"
+    if out.exists() and out.stat().st_size > 0:
+        return out
+    tmp = out.with_suffix(".part.flac")
+    run(["ffmpeg", "-v", "error", "-nostdin", "-y", "-ss", f"{start:.3f}", "-t", f"{end - start:.3f}",
+         "-i", str(path), "-vn", "-sn", "-ac", "1", "-ar", "16000", "-c:a", "flac", str(tmp)], timeout=None)
+    tmp.replace(out)
+    return out
+
+
+def local_section(path: str, dest_dir: Path, start: float, end: float) -> Path:
+    """Copy [start, end] of a local file without re-encoding (may start at the keyframe before `start`)."""
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    ext = Path(path).suffix.lower() if Path(path).suffix.lower() in (".mp4", ".mov", ".mkv", ".m4v") else ".mkv"
+    out = dest_dir / f"section_{start:.0f}_{end:.0f}{ext}"
+    if out.exists() and out.stat().st_size > 0:
+        return out
+    tmp = dest_dir / f"section_{start:.0f}_{end:.0f}.part{ext}"
+    run(["ffmpeg", "-v", "error", "-nostdin", "-y", "-ss", f"{start:.3f}", "-i", str(path),
+         "-t", f"{end - start:.3f}", "-map", "0:v:0", "-map", "0:a?", "-c", "copy",
+         "-avoid_negative_ts", "make_zero", str(tmp)], timeout=None)
+    tmp.replace(out)
+    return out
 
 
 def section_range(start: float, end: float, duration: float, pad: float = 3.0) -> tuple[float, float]:

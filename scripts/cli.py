@@ -9,10 +9,10 @@ Exit codes: 0 ok, 1 error, 3 partial success (some clips failed).
   python scripts/cli.py setup-models                     (optional YuNet face model)
   python scripts/cli.py templates list | show <id> | use <id> | set <id> key=value ... | reset <id>
   python scripts/cli.py inspect <url-or-file>
-  python scripts/cli.py analyze <url-or-file> --rights own [--template gaming-reaction] [--count 3]
+  python scripts/cli.py analyze <url-or-file> [--template gaming-reaction] [--count 3]
   python scripts/cli.py render --plan plan.json
-  python scripts/cli.py run <url-or-file> --rights own [--template ...] [--count 3]
-  python scripts/cli.py more <url-or-file> --rights own --count 2        (new moments only)
+  python scripts/cli.py run <url-or-file> [--template ...] [--count 3]
+  python scripts/cli.py more <url-or-file> --count 2        (new moments only)
   python scripts/cli.py resume [--job JOB_ID]
   python scripts/cli.py history list | show <url-or-file-or-id>
   python scripts/cli.py clean <url-or-file-or-id>          (delete cached download/analysis)
@@ -35,7 +35,7 @@ def _common(p: argparse.ArgumentParser, needs_rights: bool = True) -> None:
     p.add_argument("input", help="YouTube URL or local video file")
     if needs_rights:
         p.add_argument("--rights", choices=sorted(RIGHTS_VALUES),
-                       help="Your basis for using this video (required). Credit alone is not permission.")
+                       help="Optional. Your basis for using this video; default: you are responsible for having the rights.")
     p.add_argument("--template", help="gaming-reaction | podcast-conversation | funny-viral-moments | "
                                       "storytelling-commentary | minimal-professional (remembered)")
     p.add_argument("--count", type=int, help="number of Shorts (default 3)")
@@ -58,13 +58,13 @@ def _common(p: argparse.ArgumentParser, needs_rights: bool = True) -> None:
     p.add_argument("--transcribe", choices=["auto", "full", "candidates"],
                    help="Whisper the whole video (full) or only the strongest moments (candidates); "
                         "auto = full up to 3 hours")
+    p.add_argument("--hours", type=float, metavar="N",
+                   help="handle N hours of the video in this run (default 1: each run does the next hour)")
     p.add_argument("--full-download", action="store_true",
                    help="YouTube: download the whole video first (slow; default fetches audio batches + clips)")
     p.add_argument("--youtube-captions", action="store_true",
                    help="YouTube: use the video's own captions instead of Whisper")
     p.add_argument("--workers", type=int, help="parallel downloads (default 3)")
-    # advanced fallback only; the webcam/reaction overlay is found automatically
-    p.add_argument("--facecam", metavar="X,Y,W,H|none", help=argparse.SUPPRESS)
     p.add_argument("--1080p", dest="hd", action="store_true", help="export 1080x1920 (faster) instead of 4K")
 
 
@@ -78,11 +78,12 @@ def _parse_range(value: str | None) -> list[str] | None:
 
 def _overrides(a) -> dict:
     return {"resolution": getattr(a, "resolution", None) or ("1080x1920" if getattr(a, "hd", False) else None),
-            "facecam": getattr(a, "facecam", None), "output_root": getattr(a, "output_root", None),
+            "output_root": getattr(a, "output_root", None),
             "whisper_model": getattr(a, "whisper_model", None), "language": getattr(a, "language", None),
             "analyze_range": _parse_range(getattr(a, "analyze_range", None)),
             "transcribe_scope": getattr(a, "transcribe", None),
             "youtube_mode": "full" if getattr(a, "full_download", False) else None,
+            "hours_per_run": getattr(a, "hours", None),
             "youtube_captions": True if getattr(a, "youtube_captions", False) else None,
             "download_workers": getattr(a, "workers", None)}
 
@@ -190,8 +191,7 @@ def _inspect(value: str) -> dict:
     else:
         src = source_input.local_source(value)
     rec = HistoryStore().load(src["video_id"])
-    return {"source": src, "history": summarize(rec) if rec else None,
-            "rights_required": "Pass --rights (" + ", ".join(sorted(RIGHTS_VALUES)) + ") to process."}
+    return {"source": src, "history": summarize(rec) if rec else None}
 
 
 def _clean(query: str) -> int:

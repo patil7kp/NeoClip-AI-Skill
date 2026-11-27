@@ -88,9 +88,12 @@ def test_failed_clip_is_not_marked_used_and_resume_finishes(media, small_cfg, mo
     assert len(store.used_segments(r["video_id"])) == 1
 
 
-def test_rights_required(media, small_cfg):
-    with pytest.raises(RightsError):
-        pipeline.run_auto(str(media["talk"]), None, cfg_overrides=small_cfg)
+def test_runs_without_rights_flag_and_keeps_copyright_note(media, small_cfg):
+    r = pipeline.run_auto(str(media["talk"]), None, template_id="minimal-professional", count=1,
+                          cfg_overrides=small_cfg)
+    assert r["status"] == "completed"
+    md = Path(r["metadata_file"]).read_text()
+    assert "Rights were not stated" in md or "copyright_third_party" in md or "Risk check" in md
 
 
 def test_agent_plan_render(media, small_cfg, tmp_path):
@@ -402,3 +405,20 @@ def test_sound_library_uses_only_cleared_generic_sounds(tmp_path):
     names = [p.name for p in library_files(str(lib), "laugh")]
     assert names == ["generic-laugh.mp3"]
     assert blocked("movie_quote_wow") and blocked("Fortnite-win") and not blocked("deep-boom")
+
+
+def test_local_file_goes_hour_by_hour_in_batches(media, small_cfg, capsys):
+    """Each run takes the next unprocessed block (an 'hour', shrunk to 1 minute here), audio in batches."""
+    cfg = {**small_cfg, "hours_per_run": 1 / 60, "audio_chunk_minutes": 0.5}  # 60 s blocks, 60 s batches
+    r1 = pipeline.run_auto(str(media["talk"]), None, template_id="podcast-conversation", count=1,
+                           subtitles=str(media["srt"]), cfg_overrides=cfg)
+    assert r1["status"] == "completed", json.dumps(r1, indent=1)[:2000]
+    assert r1["window"]["processed"] == "00:00:00 - 00:01:00" and r1["window"]["next"] == "00:01:00 - 00:02:00"
+    assert r1["clips"][0]["source_range"][1] <= 61
+    err = capsys.readouterr().err
+    assert "Batch 1/1: 00:00:00-00:01:00" in err and "Working on 00:00:00-00:01:00" in err
+    r2 = pipeline.run_auto(str(media["talk"]), None, template_id="podcast-conversation", count=1,
+                           subtitles=str(media["srt"]), cfg_overrides=cfg)
+    assert r2["status"] == "completed"
+    assert r2["clips"][0]["source_range"][0] >= 59
+    assert r2["window"]["processed"] == "00:01:00 - 00:02:00" and r2["window"]["next"] is None

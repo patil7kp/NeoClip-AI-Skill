@@ -170,6 +170,19 @@ class HistoryStore:
             return []
         return self._mutate(video_id, fn)
 
+    def mark_window_done(self, video_id: str, start: float, end: float) -> None:
+        """Hour-by-hour mode: remember that [start, end] has been processed, so the next run moves on."""
+        def fn(rec):
+            done = rec.setdefault("windows_done", [])
+            w = [round(float(start), 3), round(float(end), 3)]
+            if w not in done:
+                done.append(w)
+                done.sort()
+        self._mutate(video_id, fn)
+
+    def windows_done(self, video_id: str) -> list[list[float]]:
+        return list((self.load(video_id) or {}).get("windows_done") or [])
+
     def set_caption_preset(self, video_id: str, preset: str) -> None:
         def fn(rec):
             rec["caption_preset"] = preset

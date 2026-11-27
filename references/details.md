@@ -32,11 +32,11 @@ The old way downloaded the whole video first (often 10–50 GB for 25 hours at 4
 
 Useful options:
 ```bash
-python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --rights own --range 2:00:00-6:00:00   # only search part of it
-python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --rights own --transcribe full          # Whisper every hour
-python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --rights own --whisper-model base       # faster Whisper
-python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --rights own --workers 5                # more parallel downloads
-python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --rights own --full-download            # old behaviour
+python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --range 2:00:00-6:00:00   # only search part of it
+python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --transcribe full          # Whisper every hour
+python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --whisper-model base       # faster Whisper
+python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --workers 5                # more parallel downloads
+python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --full-download            # old behaviour
 ```
 
 Rendering uses Apple VideoToolbox or NVIDIA NVENC automatically when FFmpeg has them, and falls back to x264 if
@@ -54,7 +54,7 @@ Environment: `YT_SHORTS_STATE_DIR`, `YT_SHORTS_OUTPUT_ROOT`, `YT_SHORTS_RESOLUTI
 
 ## Tests
 ```bash
-python -m pytest -q      # 80 tests, about 1 minute, needs FFmpeg
+python -m pytest -q      # 81 tests, about 1 minute, needs FFmpeg
 ```
 
 ## Honest limitations
@@ -66,7 +66,7 @@ python -m pytest -q      # 80 tests, about 1 minute, needs FFmpeg
 - **Policy screening** can't see visual nudity or gore and can't judge fair use. It flags potential risks and
   is not legal advice.
 - **4K**: most sources are upscaled when converted to 9:16 4K. Every result says so.
-- **Fast mode framing** checks faces and the facecam inside each downloaded clip, not across the whole video.
+- **Fast mode framing** checks faces and the reaction overlay inside each downloaded clip, not across the whole video.
   Use `--full-download` if a template needs whole-video visual analysis.
 - **YouTube downloads** depend on yt-dlp and YouTube's current behaviour. Private, age-gated, members-only or
   region-blocked videos are not supported and are not bypassed.
@@ -86,7 +86,7 @@ Sound effects are added only when a moment really calls for one, and skipped oth
 
 ## More commands
 ```bash
-python scripts/cli.py analyze "https://youtu.be/XXXXXXXXXXX" --rights own > candidates.json
+python scripts/cli.py analyze "https://youtu.be/XXXXXXXXXXX" > candidates.json
 python scripts/cli.py render --plan plan.json
 python scripts/cli.py history show ~/Videos/stream.mp4
 python scripts/cli.py templates list

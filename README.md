@@ -2,7 +2,7 @@
 
 # NeoClip-AI-Skill
 
-**Created by Kiran Patil - NeoClip-AI-Skill** · v2.0.0 · © 2026 Kiran Patil. All Rights Reserved.
+**Created by Kiran Patil - NeoClip-AI-Skill** · v2.1.0 · © 2026 Kiran Patil. All Rights Reserved.
 
 Turn long videos into ready-to-post YouTube Shorts with your AI agent. Free, local, no paid API.
 
@@ -14,7 +14,7 @@ Turn long videos into ready-to-post YouTube Shorts with your AI agent. Free, loc
 - 🔥 **Finds the best moments:** reactions, laughs, loud spikes and YouTube's "most replayed" parts.
 - 🔁 **Never repeats:** remembers used timestamps, so every new Short is fresh.
 - 🎨 **5 templates:** Gaming, Podcast, Funny, Storytelling, Minimal.
-- 🎮 **Reaction cam:** finds the streamer's cam automatically and shows it whole above the gameplay.
+- 🎮 **Reaction videos:** finds the reaction overlay in gameplay automatically and shows it whole above the game.
 - 📱 **Smart 9:16 crop:** follows faces and action, no blind centre crops.
 - 💬 **Captions:** word-by-word, synced, 4 styles, never covering faces.
 - 🔊 **Sound effects:** only when the moment needs one, never copyrighted.
@@ -62,7 +62,7 @@ python scripts/cli.py doctor          # should say "ready": true
 
 Just ask your agent:
 ```text
-Make 3 Shorts from https://youtu.be/XXXXXXXXXXX with the gaming template. It's my own stream.
+Make Shorts from https://youtu.be/XXXXXXXXXXX
 ```
 ```text
 Give me 2 more Shorts from that same video.
@@ -70,18 +70,18 @@ Give me 2 more Shorts from that same video.
 
 Or run it yourself:
 ```bash
-python scripts/cli.py run ~/Videos/stream.mp4 --rights own --template gaming-reaction --count 3
-python scripts/cli.py more ~/Videos/stream.mp4 --rights own --count 2
+python scripts/cli.py run ~/Videos/stream.mp4 --template gaming-reaction --count 3
+python scripts/cli.py more ~/Videos/stream.mp4 --count 2
 python scripts/cli.py resume
 ```
 Add `--1080p` for faster renders, or `--range 2:00:00-6:00:00` to search only part of a long video.
 
 ## Good to know
 
-- **Long videos:** YouTube videos are never downloaded in full. Audio comes in 1-hour batches, and only the chosen clips are downloaded.
+- **Hour by hour:** each run does the next hour of the video (3 Shorts), then the next run does the following hour. `--hours 3` does 3 hours at once. YouTube videos are never downloaded in full.
 - **Sound effects:** added only when a moment needs one. To use your own, put generic, copyright-free files in `~/NeoClip-SFX/cleared/`.
 - **Output:** `YouTube_Shorts/YYYY-MM-DD/` with the Shorts and one `YOUTUBE_METADATA.md` ([example](examples/example-metadata.md)).
-- **Rights:** only use videos you own or have permission for. Copyright checks are warnings, not guarantees.
+- **No questions:** send a link and it starts. You are responsible for having the rights to the video; copyright checks are warnings, not guarantees.
 
 More: [details, options and limitations](references/details.md) · [agent setup](references/agent-compatibility.md) · [changelog](CHANGELOG.md)
 
@@ -91,7 +91,7 @@ More: [details, options and limitations](references/details.md) · [agent setup]
 **Created & Developed By:** Kiran Patil
 **Role:** Software Engineer
 **Project Type:** AI Agent Skill – YouTube Shorts Automation
-**Version:** 2.0.0
+**Version:** 2.1.0
 **Copyright:** © 2026 Kiran Patil. All Rights Reserved.
 
 ### Contact Information

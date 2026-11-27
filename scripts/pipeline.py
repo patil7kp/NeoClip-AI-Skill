@@ -1,6 +1,6 @@
 """End-to-end orchestration (the 30-step workflow in workflows/main-workflow.md).
 
-    prepare  -> validate input + rights, identify video, load history, download to work dir
+    prepare  -> validate input, identify video, load history, download to work dir
     analyze  -> probe, visual + audio analysis, transcription (cached per video)
     select   -> rank moments in UNUSED footage (or validate the agent's plan)
     produce  -> per clip: reserve in history, edit plan, layout, captions, policy, music,
@@ -51,8 +51,16 @@ class Pipeline:
         if remember_template and template_id:
             update_preferences(template=template["id"])
         wd = work_dir(source["video_id"])
-        fast = source["kind"] == "youtube" and self.cfg.get("youtube_mode", "fast") != "full"
-        if fast:
+        if source["kind"] == "youtube":
+            fast = self.cfg.get("youtube_mode", "fast") != "full"
+        else:
+            fast = bool(self.cfg.get("batch_mode", True))
+        if fast and source["kind"] != "youtube":
+            # Local file: nothing to download. Audio is analysed in 1-hour batches and each chosen clip is
+            # cut out on its own, exactly like a YouTube link, so long files never go through in one pass.
+            meta = video_analyzer.probe(source["local_path"])
+            source["duration"] = meta["duration"] or source["duration"]
+        elif fast:
             # No full download: analysis uses captions, the replay heatmap and chunked audio; only the
             # chosen clip ranges are downloaded (at full quality) when they are rendered.
             meta = {"duration": source["duration"], "width": int(source.get("width") or 1920),
@@ -144,7 +152,6 @@ class Pipeline:
                     warnings.append(f"Transcription unavailable ({exc.message}). Shorts will have no captions; "
                                     f"{exc.hint}")
                     transcript = None
-        visual = video_analyzer.apply_facecam_override(visual, self.cfg.get("facecam"), meta["width"], meta["height"])
         analysis = {"visual": visual, "audio": audio, "transcript": transcript, "warnings": warnings}
         return analysis
 
@@ -164,7 +171,7 @@ class Pipeline:
         warnings: list[str] = []
         heatmap = src.get("heatmap") or []
         transcript = transcription.load_subtitles(subtitles) if subtitles else None
-        if transcript is None and self.cfg.get("youtube_captions"):
+        if transcript is None and self.cfg.get("youtube_captions") and src["kind"] == "youtube":
             subs = source_input.download_youtube_subtitles(src, wd / "subs", self.cfg.get("language"))
             if subs:
                 try:
@@ -186,8 +193,11 @@ class Pipeline:
                             "the loudness/replay pass, not every hour. Set transcribe_scope to 'full' to "
                             "transcribe everything (much slower).")
             transcript = self._transcribe_candidates(ctx, audio, visual, heatmap, count, warnings)
-        msg = "Fast mode: the full video was not downloaded; only the chosen clips are fetched in full quality."
-        if not heatmap:
+        if src["kind"] != "youtube":
+            msg = "Batch mode: audio was analysed hour by hour; only the chosen clips are cut out and analysed."
+        else:
+            msg = "Fast mode: the full video was not downloaded; only the chosen clips are fetched in full quality."
+        if not heatmap and src["kind"] == "youtube":
             msg += " YouTube has no 'most replayed' data for this video, so selection uses audio and speech."
         warnings.append(msg)
         return {"visual": visual, "audio": audio, "transcript": transcript, "warnings": warnings,
@@ -233,7 +243,7 @@ class Pipeline:
             need_tr = whisper and not tj.exists()
             if part and not need_tr:
                 return part, None
-            path = source_input.download_youtube_audio_section(src, cdir, s, e)
+            path = self._audio_section(src, cdir, s, e)
             if part is None:
                 m = video_analyzer.probe(path, require_video=False)
                 part = audio_analyzer.shift_audio(audio_analyzer.analyze_audio(path, m), s)
@@ -263,6 +273,7 @@ class Pipeline:
                 part, path = pending.pop(i).result()
                 top_up()  # keep downloads running while this batch is transcribed
                 parts.append(part)
+                log(f"Batch {i + 1}/{len(chunks)}: {fmt_ts(rng[0])}-{fmt_ts(rng[1])} audio analysed")
                 tj = names(rng)[1]
                 if whisper:
                     tr = read_json(tj)
@@ -285,6 +296,12 @@ class Pipeline:
                           "segments": sorted(segments, key=lambda x: x["start"])}
         return audio_analyzer.merge_audio(parts), transcript
 
+    @staticmethod
+    def _audio_section(src: dict, dest: Path, s: float, e: float) -> Path:
+        if src["kind"] == "youtube":
+            return source_input.download_youtube_audio_section(src, dest, s, e)
+        return source_input.local_audio_section(src["local_path"], dest, s, e)
+
     def _transcribe_candidates(self, ctx, audio, visual, heatmap, count, warnings) -> dict | None:
         """No captions: Whisper listens only to the most promising moments, fetched as small audio sections."""
         from concurrent.futures import ThreadPoolExecutor
@@ -305,7 +322,7 @@ class Pipeline:
         tdir = wd / "whisper"
         workers = max(1, int(self.cfg.get("download_workers") or 1))
         with ThreadPoolExecutor(max_workers=workers) as pool:  # downloads in parallel, Whisper one by one
-            futures = [pool.submit(source_input.download_youtube_audio_section, src, tdir, s, e) for s, e in need]
+            futures = [pool.submit(self._audio_section, src, tdir, s, e) for s, e in need]
             segments = list((cached or {}).get("segments") or [])
             lang = (cached or {}).get("language")
             try:
@@ -416,9 +433,12 @@ class Pipeline:
     def _fetch_section(self, ctx: dict, start: float, end: float) -> tuple[Path, float]:
         src, meta = ctx["source"], ctx["meta"]
         s0, e0 = source_input.section_range(start, end, meta["duration"], float(self.cfg.get("section_padding", 3)))
-        path = source_input.download_youtube_section(src, ctx["work"] / "sections", s0, e0,
-                                                     int(self.cfg["download_max_height"]),
-                                                     exact=bool(self.cfg.get("exact_section_cuts")))
+        if src["kind"] == "youtube":
+            path = source_input.download_youtube_section(src, ctx["work"] / "sections", s0, e0,
+                                                         int(self.cfg["download_max_height"]),
+                                                         exact=bool(self.cfg.get("exact_section_cuts")))
+        else:
+            path = source_input.local_section(src["local_path"], ctx["work"] / "sections", s0, e0)
         # A stream-copied section may begin at the keyframe before s0. If the file is longer than asked,
         # the extra is at the start, so its first frame is at e0 - duration on the source timeline.
         got = video_analyzer.probe(path)["duration"]
@@ -446,7 +466,6 @@ class Pipeline:
                 visual = video_analyzer.shift_visual(
                     video_analyzer.analyze_visual(section_path, meta, cfg["analysis_fps"], cfg["face_detect_fps"]),
                     source_start)
-                visual = video_analyzer.apply_facecam_override(visual, cfg.get("facecam"), meta["width"], meta["height"])
             fps = video_renderer.output_fps(meta["fps"], cfg["max_fps"])
             edit = video_editor.plan_edit(clip, template, analysis["audio"], analysis["transcript"], fps)
             layout = smart_cropper.plan_layout(meta["width"], meta["height"], self.out_w, self.out_h,
@@ -627,6 +646,27 @@ def audio_processor_decide(template, audio, clip, speech_cov, cfg, music_overlap
     return decide_music(template, audio, clip, speech_cov, cfg, music_overlap)
 
 
+# ---------------------------------------------------------------------- hour by hour
+def _window_size(cfg: dict) -> float:
+    return max(60.0, float(cfg.get("hours_per_run") or 1) * 3600)
+
+
+def next_window(store: HistoryStore, video_id: str, duration: float, cfg: dict) -> list[float] | None:
+    """The first block of the video (1 hour by default) that hasn't been processed yet."""
+    size, done = _window_size(cfg), store.windows_done(video_id)
+    t = 0.0
+    while t < duration - 1:
+        w = [round(t, 3), round(min(duration, t + size), 3)]
+        if not any(d[0] <= w[0] + 1 and w[1] - 1 <= d[1] for d in done):
+            return w
+        t += size
+    return None
+
+
+def _hour_by_hour(cfg: dict) -> bool:
+    return bool(cfg.get("hour_by_hour", True)) and not cfg.get("analyze_range")
+
+
 # ---------------------------------------------------------------------- high level entry points
 def run_auto(value: str, rights: str | None, *, template_id: str | None = None, count: int | None = None,
              cfg_overrides: dict | None = None, subtitles: str | None = None, date: str | None = None,
@@ -640,9 +680,40 @@ def run_auto(value: str, rights: str | None, *, template_id: str | None = None, 
         raise InputError("--count must be at least 1.")
     ctx = pipe.prepare(value, rights, template_id, creator=creator, channel_url=channel_url,
                        source_url=source_url, title=title)
-    analysis = pipe.analyze(ctx, subtitles=subtitles, count=count)
-    clips, sel, warnings = pipe.select(ctx, analysis, count, plan_clips=plan_clips, use_ai=use_ai)
-    analysis["warnings"] += warnings
+    vid, dur = ctx["source"]["video_id"], ctx["meta"]["duration"]
+    window = None
+    if _hour_by_hour(cfg) and dur > 0:
+        if plan_clips:
+            # agent plan: analyse just the block the clips came from
+            size = _window_size(cfg)
+            lo = min(c["start"] for c in plan_clips)
+            hi = max(c["end"] for c in plan_clips)
+            window = [round(lo // size * size, 3), round(min(dur, (hi // size + 1) * size), 3)]
+        else:
+            window = next_window(pipe.store, vid, dur, cfg)
+            # every hour done: continue with whatever unused footage is left anywhere in the video
+    while True:
+        if window:
+            pipe.cfg["analyze_range"] = window
+            log(f"Working on {fmt_ts(window[0])}-{fmt_ts(window[1])} of {fmt_ts(dur)} "
+                f"({count} Short(s) from this part)")
+        analysis = pipe.analyze(ctx, subtitles=subtitles, count=count)
+        clips, sel, warnings = pipe.select(ctx, analysis, count, plan_clips=plan_clips, use_ai=use_ai)
+        analysis["warnings"] += warnings
+        if clips or dry_run or not window or plan_clips:
+            break
+        # nothing usable in this hour: mark it and move on to the next one
+        pipe.store.mark_window_done(vid, *window)
+        window = next_window(pipe.store, vid, dur, cfg)
+        if window is None:
+            pipe.cfg["analyze_range"] = None
+            analysis = pipe.analyze(ctx, subtitles=subtitles, count=count)
+            clips, sel, warnings = pipe.select(ctx, analysis, count, plan_clips=plan_clips, use_ai=use_ai)
+            analysis["warnings"] += warnings
+            break
+    if window:
+        analysis["warnings"].append(f"Hour-by-hour: this run used {fmt_ts(window[0])}-{fmt_ts(window[1])}. "
+                                    "Ask for more Shorts to continue with the next part.")
     if dry_run:
         return {"status": "dry_run", "video_id": ctx["source"]["video_id"], "template": ctx["template"]["id"],
                 "selected": clips, "candidates": sel["candidates"], "warnings": analysis["warnings"]}
@@ -650,8 +721,14 @@ def run_auto(value: str, rights: str | None, *, template_id: str | None = None, 
         return {"status": "nothing_to_do", "video_id": ctx["source"]["video_id"],
                 "warnings": analysis["warnings"] + ["No unused moments meet the template's minimum length."],
                 "history": {"used_segments": pipe.store.used_segments(ctx["source"]["video_id"])}}
-    return pipe.produce(ctx, analysis, clips, date=date, output_root=cfg["output_root"], captions=captions,
-                        caption_preset=caption_preset)
+    result = pipe.produce(ctx, analysis, clips, date=date, output_root=cfg["output_root"], captions=captions,
+                          caption_preset=caption_preset)
+    if window and result.get("generated"):
+        pipe.store.mark_window_done(vid, *window)
+        nxt = next_window(pipe.store, vid, dur, cfg)
+        result["window"] = {"processed": f"{fmt_ts(window[0])} - {fmt_ts(window[1])}",
+                            "next": f"{fmt_ts(nxt[0])} - {fmt_ts(nxt[1])}" if nxt else None}
+    return result
 
 
 def analyze_only(value: str, rights: str | None, *, template_id: str | None = None, count: int | None = None,
@@ -661,20 +738,36 @@ def analyze_only(value: str, rights: str | None, *, template_id: str | None = No
     pipe = Pipeline(cfg)
     count = int(count or cfg["default_count"])
     ctx = pipe.prepare(value, rights, template_id, **src_kw)
-    analysis = pipe.analyze(ctx, subtitles=subtitles, count=count)
-    clips, sel, warnings = pipe.select(ctx, analysis, count, use_ai=False)
+    vid, dur = ctx["source"]["video_id"], ctx["meta"]["duration"]
+    window = next_window(pipe.store, vid, dur, cfg) if _hour_by_hour(cfg) and dur > 0 else None
+    while True:
+        if window:
+            pipe.cfg["analyze_range"] = window
+            log(f"Working on {fmt_ts(window[0])}-{fmt_ts(window[1])} of {fmt_ts(dur)}")
+        analysis = pipe.analyze(ctx, subtitles=subtitles, count=count)
+        clips, sel, warnings = pipe.select(ctx, analysis, count, use_ai=False)
+        if sel["candidates"] or not window:
+            break
+        pipe.store.mark_window_done(vid, *window)
+        window = next_window(pipe.store, vid, dur, cfg)
+        if window is None:
+            pipe.cfg["analyze_range"] = None
+            analysis = pipe.analyze(ctx, subtitles=subtitles, count=count)
+            clips, sel, warnings = pipe.select(ctx, analysis, count, use_ai=False)
+            break
     rec = pipe.store.load(ctx["source"]["video_id"]) or {}
     return {
         "status": "analyzed", "video_id": ctx["source"]["video_id"], "template": ctx["template"]["id"],
         "source": {k: ctx["source"].get(k) for k in ("kind", "title", "url", "creator", "channel_url", "duration")},
         "content_hint": analysis["visual"].get("content_hint"),
-        "facecam_detected": (None if ctx.get("fast") else bool(analysis["visual"].get("facecam"))),
+        "reaction_overlay_detected": (None if ctx.get("fast") else bool(analysis["visual"].get("reaction_overlay"))),
         "analysis_mode": "fast" if ctx.get("fast") else "full",
         "replay_heatmap": bool(analysis.get("heatmap")),
         "has_transcript": analysis["transcript"] is not None,
         "previously_completed": [{"range": f"{fmt_ts(c['start'])} - {fmt_ts(c['end'])}", "file": c["filename"],
                                   "date": c["processing_date"]} for c in rec.get("clips", [])
                                  if c["status"] == "completed"],
+        "window": f"{fmt_ts(window[0])} - {fmt_ts(window[1])}" if window else None,
         "candidates": sel["candidates"], "suggested": [c["rank"] for c in sel["selected"]],
         "warnings": analysis["warnings"] + warnings,
         "next_step": "Write a plan JSON (see examples/example-workflow.md) and run: cli.py render --plan plan.json",
@@ -684,7 +777,7 @@ def analyze_only(value: str, rights: str | None, *, template_id: str | None = No
 def render_plan(plan_path: str, cfg_overrides: dict | None = None) -> dict:
     plan = read_json(Path(plan_path))
     if not plan or "input" not in plan or not plan.get("clips"):
-        raise InputError(f"{plan_path} is not a valid plan.", "A plan needs 'input', 'rights' and 'clips'.")
+        raise InputError(f"{plan_path} is not a valid plan.", "A plan needs 'input' and 'clips'.")
     for c in plan["clips"]:
         if "start" not in c or "end" not in c:
             raise InputError("Every plan clip needs start and end.")

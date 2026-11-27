@@ -1,7 +1,7 @@
 {
   "name": "neoclip-ai-skill",
   "displayName": "NeoClip-AI-Skill",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Turn long videos (YouTube links or local files) into edited 9:16 YouTube Shorts: automatic reaction-cam layouts, synced captions, 4K export, matched sound effects, copyright risk checks and copy-paste YouTube metadata. Remembers used timestamps so Shorts never repeat.",
   "author": {
     "name": "Kiran Patil",
