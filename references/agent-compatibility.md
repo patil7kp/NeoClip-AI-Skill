@@ -37,11 +37,13 @@ FFmpeg must be installed separately. Use `brew install ffmpeg` (macOS), `winget 
 or `sudo apt install ffmpeg` (Debian/Ubuntu). The build must include libass. Standard builds do.
 
 ### Claude Code
-As a plugin (recommended), inside Claude Code:
-```text
-/plugin marketplace add patil7kp/NeoClip-AI-Skill
-/plugin install neoclip-ai-skill@neoclip-ai
+As a plugin (recommended), in Terminal, one line at a time:
+```bash
+claude plugin marketplace add patil7kp/NeoClip-AI-Skill
+claude plugin install neoclip-ai-skill@neoclip-ai
 ```
+Inside a Claude Code chat, send the same as `/plugin ...` commands, one per message. The Claude desktop app's
+`/plugin` takes no arguments, so use Terminal there.
 Or as a plain skill folder:
 ```bash
 mkdir -p ~/.claude/skills && cp -r neoclip-ai-skill ~/.claude/skills/

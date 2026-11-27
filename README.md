@@ -25,11 +25,14 @@ Turn long videos into ready-to-post YouTube Shorts with your AI agent. Free, loc
 
 ## Install
 
-**Claude Code (plugin):**
-```text
-/plugin marketplace add patil7kp/NeoClip-AI-Skill
-/plugin install neoclip-ai-skill@neoclip-ai
+**Claude Code (plugin):** run these two lines in Terminal, one at a time:
+```bash
+claude plugin marketplace add patil7kp/NeoClip-AI-Skill
 ```
+```bash
+claude plugin install neoclip-ai-skill@neoclip-ai
+```
+Inside a Claude Code chat you can send `/plugin marketplace add patil7kp/NeoClip-AI-Skill`, then `/plugin install neoclip-ai-skill@neoclip-ai`, as two separate messages. In the Claude desktop app, `/plugin` takes no text after it, so use the Terminal lines above.
 
 **Any other agent** (Codex, Gemini CLI, Cursor, Copilot): send it this prompt.
 ```text
