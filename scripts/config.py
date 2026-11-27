@@ -24,7 +24,7 @@ DEFAULTS: dict[str, Any] = {
     "true_peak_db": -1.0,
     "analysis_fps": 2.0,
     "face_detect_fps": 1.0,
-    "whisper_model": "small",
+    "whisper_model": "base",              # base: about 2x faster than small, still good for picking captions
     "whisper_device": "auto",              # auto | cpu | cuda
     "whisper_compute_type": "auto",
     "language": None,                      # None = auto-detect
@@ -39,7 +39,8 @@ DEFAULTS: dict[str, Any] = {
     "download_max_height": 2160,
     "youtube_mode": "fast",                # fast: captions + audio chunks + clip sections only | full: whole video
     "hour_by_hour": True,                  # each run handles the next unprocessed hour (3 Shorts), then stops
-    "hours_per_run": 1,                    # --hours N: handle N hours in one run
+    "window_minutes": 15,                  # quick mode: each run analyses the next 15 minutes (fast Shorts)
+    "stream_youtube_audio": True,          # read audio straight from the stream (no download); False = old way
     "batch_mode": True,                    # local files too: audio in 1-hour batches, clips cut one by one
     "audio_chunk_minutes": 60,             # fast mode: audio is fetched, analysed and deleted chunk by chunk
     "download_workers": 3,                 # parallel chunk / clip-section downloads

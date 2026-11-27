@@ -32,7 +32,7 @@ The old way downloaded the whole video first (often 10–50 GB for 25 hours at 4
 
 Useful options:
 ```bash
-python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --range 2:00:00-6:00:00   # only search part of it
+python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --range 2:00:00-2:15:00   # only search part of it
 python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --transcribe full          # Whisper every hour
 python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --whisper-model base       # faster Whisper
 python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --workers 5                # more parallel downloads
@@ -54,7 +54,7 @@ Environment: `YT_SHORTS_STATE_DIR`, `YT_SHORTS_OUTPUT_ROOT`, `YT_SHORTS_RESOLUTI
 
 ## Tests
 ```bash
-python -m pytest -q      # 81 tests, about 1 minute, needs FFmpeg
+python -m pytest -q      # 82 tests, about 1 minute, needs FFmpeg
 ```
 
 ## Honest limitations

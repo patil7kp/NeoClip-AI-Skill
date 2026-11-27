@@ -59,7 +59,7 @@ def _common(p: argparse.ArgumentParser, needs_rights: bool = True) -> None:
                    help="Whisper the whole video (full) or only the strongest moments (candidates); "
                         "auto = full up to 3 hours")
     p.add_argument("--hours", type=float, metavar="N",
-                   help="handle N hours of the video in this run (default 1: each run does the next hour)")
+                   help="analyse N hours in this run (default: a quick 15-minute block, so Shorts come fast)")
     p.add_argument("--full-download", action="store_true",
                    help="YouTube: download the whole video first (slow; default fetches audio batches + clips)")
     p.add_argument("--youtube-captions", action="store_true",
@@ -83,7 +83,7 @@ def _overrides(a) -> dict:
             "analyze_range": _parse_range(getattr(a, "analyze_range", None)),
             "transcribe_scope": getattr(a, "transcribe", None),
             "youtube_mode": "full" if getattr(a, "full_download", False) else None,
-            "hours_per_run": getattr(a, "hours", None),
+            "window_minutes": (getattr(a, "hours", None) or 0) * 60 or None,
             "youtube_captions": True if getattr(a, "youtube_captions", False) else None,
             "download_workers": getattr(a, "workers", None)}
 

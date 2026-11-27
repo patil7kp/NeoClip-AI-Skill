@@ -25,7 +25,7 @@ from scripts import (ai_bridge, audio_analyzer, caption_generator, clip_selector
                      video_analyzer, video_editor, video_renderer)
 import datetime as _dt
 
-from scripts.common import (AIProviderError, InputError, RenderError, SkillError, TranscriptionError,
+from scripts.common import (AIProviderError, InputError, RenderError, SkillError, SourceUnavailableError, TranscriptionError,
                             ValidationFailed, atomic_write_json, fmt_ts, log, merge_intervals, now_iso,
                             parse_ts, read_json, state_dir, today, work_dir)
 from scripts.config import load_config, parse_resolution, update_preferences
@@ -180,7 +180,12 @@ class Pipeline:
                     transcript = None
         scope = self.cfg["transcribe_scope"]
         if scope == "auto":
-            scope = "full" if (b - a) <= float(self.cfg.get("full_transcribe_max_hours", 3)) * 3600 else "candidates"
+            # Hour by hour, Whisper listens only to the strongest moments of each hour (much faster than the
+            # whole hour); the chosen clips are inside those moments, so they still get captions.
+            if _hour_by_hour(self.cfg):
+                scope = "candidates"
+            else:
+                scope = "full" if (b - a) <= float(self.cfg.get("full_transcribe_max_hours", 3)) * 3600 else "candidates"
         whisper_ok = transcribe and transcript is None and transcription.available_backend() is not None
         if transcribe and transcript is None and not whisper_ok:
             warnings.append("Whisper is not installed (pip install faster-whisper), so Shorts will have no captions.")
@@ -296,9 +301,18 @@ class Pipeline:
                           "segments": sorted(segments, key=lambda x: x["start"])}
         return audio_analyzer.merge_audio(parts), transcript
 
-    @staticmethod
-    def _audio_section(src: dict, dest: Path, s: float, e: float) -> Path:
+    def _audio_section(self, src: dict, dest: Path, s: float, e: float) -> Path:
         if src["kind"] == "youtube":
+            # No-download first: FFmpeg reads just this time range from the stream. The old download step is
+            # the fallback if the stream can't be read.
+            if self.cfg.get("stream_youtube_audio", True) and src.get("_no_stream") is not True:
+                try:
+                    return source_input.stream_youtube_audio_section(src, dest, s, e)
+                except SourceUnavailableError as exc:
+                    log(f"Streaming audio failed ({exc.message}); using the download fallback for this batch.")
+                    src["_stream_failures"] = src.get("_stream_failures", 0) + 1
+                    if src["_stream_failures"] >= 3:
+                        src["_no_stream"] = True  # stop trying for the rest of this run
             return source_input.download_youtube_audio_section(src, dest, s, e)
         return source_input.local_audio_section(src["local_path"], dest, s, e)
 
@@ -648,7 +662,7 @@ def audio_processor_decide(template, audio, clip, speech_cov, cfg, music_overlap
 
 # ---------------------------------------------------------------------- hour by hour
 def _window_size(cfg: dict) -> float:
-    return max(60.0, float(cfg.get("hours_per_run") or 1) * 3600)
+    return max(60.0, float(cfg.get("window_minutes") or 15) * 60)
 
 
 def next_window(store: HistoryStore, video_id: str, duration: float, cfg: dict) -> list[float] | None:

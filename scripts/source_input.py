@@ -207,6 +207,54 @@ def download_youtube_subtitles(source: dict, dest_dir: Path, language: str | Non
     return None
 
 
+AUDIO_FORMAT = "wa[abr>=32]/ba[abr<=96]/wa/ba"
+
+
+def youtube_stream_info(source: dict) -> dict:
+    """Direct stream address for the audio track (no file is downloaded). Cached in the source dict; the
+    address expires after a few hours, so it is looked up again when a stream fails."""
+    if source.get("_stream") and not source.get("_stream_stale"):
+        return source["_stream"]
+    proc = run(["yt-dlp", "--no-playlist", "--no-warnings", "-j", "-f", AUDIO_FORMAT, source["url"]],
+               timeout=180, check=False)
+    if proc.returncode != 0:
+        raise _classify_ytdlp_error(proc.stderr.decode("utf-8", "replace"))
+    info = json.loads(proc.stdout.decode("utf-8", "replace"))
+    if not info.get("url"):
+        raise SourceUnavailableError("No direct audio stream was offered for this video.")
+    source["_stream"] = {"url": info["url"], "headers": info.get("http_headers") or {}}
+    source["_stream_stale"] = False
+    return source["_stream"]
+
+
+def stream_youtube_audio_section(source: dict, dest_dir: Path, start: float, end: float) -> Path:
+    """Read only [start, end] of the audio straight from the stream into a small file, via FFmpeg HTTP range
+    requests. No yt-dlp download step and no full-length file. The audio is decoded and written as 16 kHz mono
+    FLAC, so the start is exact (a stream copy would start at the nearest keyframe) and the file is small."""
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    stem = f"audio_{start:.0f}_{end:.0f}"
+    for existing in dest_dir.glob(stem + ".*"):
+        if not existing.name.endswith((".part", ".ytdl")) and existing.stat().st_size > 0:
+            return existing
+    st = youtube_stream_info(source)
+    headers = "".join(f"{k}: {v}\r\n" for k, v in st["headers"].items())
+    out = dest_dir / f"{stem}.flac"
+    tmp = dest_dir / f"{stem}.part.flac"
+    cmd = ["ffmpeg", "-v", "error", "-nostdin", "-y"]
+    if headers:
+        cmd += ["-headers", headers]
+    cmd += ["-ss", f"{start:.3f}", "-t", f"{end - start:.3f}", "-i", st["url"],
+            "-vn", "-sn", "-map", "0:a:0", "-ac", "1", "-ar", "16000", "-c:a", "flac", "-f", "flac", str(tmp)]
+    proc = run(cmd, timeout=None, check=False)
+    if proc.returncode != 0 or not tmp.exists() or tmp.stat().st_size == 0:
+        source["_stream_stale"] = True  # the address may have expired: look it up again next time
+        tmp.unlink(missing_ok=True)
+        raise SourceUnavailableError("Streaming the audio section failed.",
+                                     (proc.stderr or b"").decode("utf-8", "replace")[-300:])
+    tmp.replace(out)
+    return out
+
+
 def download_youtube_audio_section(source: dict, dest_dir: Path, start: float, end: float) -> Path:
     """Low-bitrate audio for [start, end] only (about 0.4 MB per minute)."""
     dest_dir.mkdir(parents=True, exist_ok=True)

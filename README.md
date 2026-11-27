@@ -9,7 +9,7 @@ Turn long videos into ready-to-post YouTube Shorts with your AI agent. Free, loc
 ## Features
 
 - 🎬 **Any video:** YouTube links or local MP4, MOV, MKV, WebM files.
-- ⚡ **Fast on long videos:** handles even 25-hour streams without downloading the whole video.
+- ⚡ **Fast on long videos:** handles even 25-hour streams without downloading the whole video, in 15-minute quick blocks.
 - 🎙️ **Real transcripts:** Whisper listens to the actual audio, no trust in YouTube captions.
 - 🔥 **Finds the best moments:** reactions, laughs, loud spikes and YouTube's "most replayed" parts.
 - 🔁 **Never repeats:** remembers used timestamps, so every new Short is fresh.
@@ -74,11 +74,11 @@ python scripts/cli.py run ~/Videos/stream.mp4 --template gaming-reaction --count
 python scripts/cli.py more ~/Videos/stream.mp4 --count 2
 python scripts/cli.py resume
 ```
-Add `--1080p` for faster renders, or `--range 2:00:00-6:00:00` to search only part of a long video.
+Add `--1080p` for faster renders, or `--range 2:00:00-2:15:00` to search only part of a long video.
 
 ## Good to know
 
-- **Hour by hour:** each run does the next hour of the video (3 Shorts), then the next run does the following hour. `--hours 3` does 3 hours at once. YouTube videos are never downloaded in full.
+- **Quick by default:** each run does the next 15 minutes of the video (3 Shorts), so the first Shorts come fast. The next run does the next 15 minutes. `--hours 1` does a full hour at once. Audio is read from the stream, and YouTube videos are never downloaded in full.
 - **Sound effects:** added only when a moment needs one. To use your own, put generic, copyright-free files in `~/NeoClip-SFX/cleared/`.
 - **Output:** `YouTube_Shorts/YYYY-MM-DD/` with the Shorts and one `YOUTUBE_METADATA.md` ([example](examples/example-metadata.md)).
 - **No questions:** send a link and it starts. You are responsible for having the rights to the video; copyright checks are warnings, not guarantees.

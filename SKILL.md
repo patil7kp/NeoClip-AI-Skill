@@ -53,12 +53,12 @@ If `doctor` shows that something is missing, tell the user exactly what to insta
 
 ## Workflow (follow in order)
 
-**Hour by hour (default, every input).** Long videos are handled one hour at a time: each run transcribes and
-analyses only the next unprocessed hour (audio in 1-hour batches, never the whole video at once), makes 3
-Shorts from it, saves them, and records that hour in history. The next request ("more Shorts") moves on to the
-following hour automatically. `--hours N` handles N hours in one run; `--range START-END` picks a part by hand.
-The result's `window` says which part was used and which comes next. Tell the user, for example: "Done with
-0:00-1:00. Ask for more and I'll do 1:00-2:00."
+**Quick by default (every input).** A run analyses only the next 15 minutes of the video, so the first 3 Shorts
+come back fast. It reads audio straight from the stream (no full download), transcribes only the strongest
+moments (base Whisper model), and renders the 3 Shorts. The next request ("more Shorts") moves on to the next
+15 minutes. `--hours N` analyses N hours in one run, and `--range START-END` picks a part by hand. The result's
+`window` says which part was used and which comes next. Tell the user, for example: "Done with 0:00-0:15. Ask for
+more and I'll do 0:15-0:30."
 
 **1. Read the request, no questions.** Take the URL or file path. Count: what the user said, else **3**.
 Template: what the user named, else pick one from the title and content (table below), else the remembered
@@ -99,7 +99,7 @@ renders and writes heuristic metadata in one go. Prefer the analyze → plan →
 because your titles and descriptions will be much better.
 
 **More Shorts from the same video:** `ENGINE more "<input>"` (or analyze plus render again). It continues
-with the next unprocessed hour, and history makes the engine skip used footage automatically. Never pass an already-used
+with the next unprocessed 15 minutes, and history makes the engine skip used footage automatically. Never pass an already-used
 range unless the user wants it. In that case, add `"overlap_reason"` to that clip.
 
 **Interrupted run:** `ENGINE resume`. Completed clips are kept and the rest are retried.
@@ -124,9 +124,9 @@ Details: `templates/<id>.md`.
 `--resolution 1080x1920` renders much faster (the default target is 2160x3840).
 `--output-root DIR` sets where the date folders go (default `./YouTube_Shorts`).
 `--subtitles file.srt` skips Whisper.
-YouTube input never downloads the whole video: audio comes in 1-hour batches and only the chosen clips are
-downloaded. For very long videos suggest `--range START-END`; `--transcribe full` makes Whisper cover every
-hour (slow on CPU), and `--full-download` restores the old behaviour.
+YouTube input never downloads the whole video: audio is read from the stream in 15-minute blocks (1-hour
+batches with `--hours 1`), and only the chosen clips are downloaded. `--range START-END` picks a part by hand;
+`--transcribe full` makes Whisper cover every block (slow on CPU), and `--full-download` restores the old behaviour.
 `--whisper-model base|small|medium|large-v3` and `--language xx` control transcription.
 `--caption-preset bold_pop|clean_pro|story|minimal` sets the caption style; it stays fixed per source
 video, so all its Shorts match.

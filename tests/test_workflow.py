@@ -243,7 +243,7 @@ def test_youtube_errors_are_explained(tmp_path, monkeypatch, media, stderr, need
 def test_youtube_fast_mode_never_downloads_full_video(media, small_cfg, tmp_path, monkeypatch):
     calls = _fake_ytdlp(tmp_path, monkeypatch, media["talk"],
                         heatmap=[{"start_time": 60, "end_time": 80, "value": 1.0}])
-    cfg = dict(small_cfg, audio_chunk_minutes=1, download_workers=2)
+    cfg = dict(small_cfg, audio_chunk_minutes=1, download_workers=2, stream_youtube_audio=False)
     r = pipeline.run_auto("https://www.youtube.com/watch?v=dQw4w9WgXcQ", "own", template_id="podcast-conversation",
                           count=1, cfg_overrides=cfg, subtitles=str(media["srt"]), use_ai=False, date="2026-11-27")
     assert r["status"] == "completed", r
@@ -300,11 +300,11 @@ def _fake_whisper(monkeypatch):
 def test_youtube_whisper_runs_per_batch_and_resumes(media, small_cfg, tmp_path, monkeypatch):
     calls = _fake_ytdlp(tmp_path, monkeypatch, media["talk"])
     seen = _fake_whisper(monkeypatch)
-    cfg = dict(small_cfg, audio_chunk_minutes=1, transcribe_scope="full")
+    cfg = dict(small_cfg, audio_chunk_minutes=1, transcribe_scope="full", stream_youtube_audio=False)
     res = pipeline.analyze_only("https://youtu.be/dQw4w9WgXcQ", "own", count=1, cfg_overrides=cfg)
     assert res["has_transcript"] and len(seen) == 2
     wd = Path(os.environ["YT_SHORTS_STATE_DIR"]) / "work" / "yt-dQw4w9WgXcQ"
-    tr_files = sorted((wd / "audio_chunks").glob("*.whisper_small.json"))
+    tr_files = sorted((wd / "audio_chunks").glob("*.whisper_base.json"))
     assert len(tr_files) == 2
     starts = sorted(json.loads(p.read_text())["segments"][0]["start"] for p in tr_files)
     assert starts == [1.0, 61.0]  # each batch is shifted onto the source timeline
@@ -409,7 +409,7 @@ def test_sound_library_uses_only_cleared_generic_sounds(tmp_path):
 
 def test_local_file_goes_hour_by_hour_in_batches(media, small_cfg, capsys):
     """Each run takes the next unprocessed block (an 'hour', shrunk to 1 minute here), audio in batches."""
-    cfg = {**small_cfg, "hours_per_run": 1 / 60, "audio_chunk_minutes": 0.5}  # 60 s blocks, 60 s batches
+    cfg = {**small_cfg, "window_minutes": 1, "audio_chunk_minutes": 0.5}  # 60 s blocks, 60 s batches
     r1 = pipeline.run_auto(str(media["talk"]), None, template_id="podcast-conversation", count=1,
                            subtitles=str(media["srt"]), cfg_overrides=cfg)
     assert r1["status"] == "completed", json.dumps(r1, indent=1)[:2000]
@@ -422,3 +422,31 @@ def test_local_file_goes_hour_by_hour_in_batches(media, small_cfg, capsys):
     assert r2["status"] == "completed"
     assert r2["clips"][0]["source_range"][0] >= 59
     assert r2["window"]["processed"] == "00:01:00 - 00:02:00" and r2["window"]["next"] is None
+
+
+def test_youtube_audio_is_read_from_the_stream_without_download(media, tmp_path, monkeypatch):
+    """No-download path: FFmpeg reads only the requested time range of the audio. The stream address is a local
+    file here (FFmpeg reads it the same way it reads an HTTP address), so this needs no network."""
+    from scripts import source_input
+    from scripts.common import run
+    src = {"kind": "youtube", "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}
+    monkeypatch.setattr(source_input, "youtube_stream_info",
+                        lambda s: {"url": str(media["talk"]), "headers": {}})
+    downloads = []
+    monkeypatch.setattr(source_input, "download_youtube_audio_section",
+                        lambda *a, **k: downloads.append(a) or (_ for _ in ()).throw(AssertionError("downloaded")))
+    p = source_input.stream_youtube_audio_section(src, tmp_path / "s", 30, 50)
+    assert p.exists() and not downloads
+    dur = float(run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(p)]).stdout)
+    assert 19 < dur < 21
+    # a broken stream falls back to the download step, and the failure is remembered for later batches
+    src2 = {"kind": "youtube", "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}
+    monkeypatch.setattr(source_input, "youtube_stream_info",
+                        lambda s: {"url": str(tmp_path / "missing.mp4"), "headers": {}})
+    fell = []
+    monkeypatch.setattr(source_input, "download_youtube_audio_section",
+                        lambda s, d, a, b: fell.append((a, b)) or p)
+    from scripts.config import load_config
+    pipe = pipeline.Pipeline({**load_config(None), "stream_youtube_audio": True})
+    assert pipe._audio_section(src2, tmp_path / "f", 0, 20) == p and fell == [(0, 20)]
+    assert src2.get("_stream_stale") is True

@@ -3,9 +3,10 @@
 NeoClip-AI-Skill, created by Kiran Patil. © 2026 Kiran Patil. All Rights Reserved.
 
 ## 2.1.0 (2026-11-27)
-- **Hour by hour (default):** each run transcribes and analyses only the next unprocessed hour, makes 3
-  Shorts, and the next run continues with the following hour. Local files are batched too. `--hours N`
-  for several hours at once; progress lines like `Batch 3/25: 02:00:00-03:00:00`.
+- **Quick by default:** each run analyses the next 15 minutes and makes 3 Shorts; the next run continues.
+  `--hours N` for more. Local files are batched too; progress lines like `Batch 3/25: 00:00:00-00:01:00`.
+- **No-download audio:** YouTube audio is read straight from the stream (FFmpeg range reads, 16 kHz mono FLAC),
+  with the old download as a fallback. Only the chosen moments are transcribed; the default Whisper model is `base`.
 - **No questions:** send a link and it starts. Rights are never asked (the user is responsible; `--rights`
   is optional), and copyright notes stay in Publishing Notes.
 - **Manual overlay option removed:** the reaction overlay in gameplay is always found automatically.
