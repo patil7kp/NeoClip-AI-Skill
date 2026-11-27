@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/banner.png" alt="NeoClip-AI-Skill banner" width="100%"></p>
+<p align="center"><img src="assets/banner-animated.webp" alt="NeoClip-AI-Skill banner" width="100%"></p>
 
 # NeoClip-AI-Skill
 
