@@ -17,84 +17,20 @@ already used, so it never makes the same Short twice.
 
 ## Features
 
-**Inputs**
-- YouTube links (watch, youtu.be, Shorts, live) or local MP4, MOV, MKV, WebM, M4V and AVI files.
-- Rights check first: you say why you may use the video (own, permission, licensed, Creative Commons, public domain).
-
-**Long videos, fast (even 25-hour streams)**
-- YouTube videos are never downloaded in full. Audio is fetched in 1-hour batches, in parallel, then deleted.
-- Whisper transcribes the real audio. YouTube captions are not trusted by default.
-- Resumes where it stopped: finished batches are kept, so an interrupted run doesn't start over.
-- Only the chosen clips are downloaded at full quality, while earlier clips render.
-- `--range` to analyse only part of a video, `--workers` to set parallel downloads.
-
-**Finding the best moments**
-- Uses loudness spikes, laughter and reactions, motion, scene cuts, faces, cue words and YouTube's "most replayed" graph.
-- Clips start and end on full sentences, with a strong hook and a clean ending.
-- Each template weights these signals differently. The agent reviews the transcript excerpts before rendering.
-
-**Never the same Short twice**
-- Remembers every timestamp it has used, per video, across sessions.
-- `more` makes new Shorts only from footage not used yet. Crash-safe history.
-
-**5 editing templates**
-- Gaming Reaction, Podcast & Conversation, Funny & Viral, Storytelling & Commentary, Minimal Professional.
-- Your choice and your tweaks are remembered (`templates use`, `templates set`, `templates reset`).
-
-**Gaming reaction cam**
-- Finds the reaction cam automatically: a webcam, a cam with or without a border, or any picture-in-picture
-  overlay, even with no face in it.
-- The whole cam is shown on top, never cut off. The gameplay fills the rest.
-
-**Smart 9:16 framing**
-- Follows the speaker's face, keeps two people in frame together, follows the action.
-- Blurred-background fit when nothing can be cropped well. No blind centre crops.
-
-**Editing**
-- Removes dead pauses without changing what was said.
-- Gentle punch-in and push zooms, jump-cut treatment, hook text at the start, fades.
-
-**Captions**
-- Word-by-word captions synced to the speech, with the current word highlighted.
-- 4 styles: bold pop, clean pro, story, minimal. Kept in the safe zone, away from faces and the gameplay.
-- Word fixes for names and games (for example "valorent" to "Valorant").
-
-**Sound effects (only when needed)**
-- A laugh, a surprise boom or a soft hit, only on a matching moment. Nothing otherwise.
-- Built-in effects or your own cleared files. Never copyrighted sounds.
-
-**Music**
-- Only tracks from your own verified, licensed library, ducked under speech. Otherwise the original audio stays.
-
-**4K export**
-- 2160×3840 by default, `--1080p` for faster renders.
-- Hardware encoding on Mac (VideoToolbox) and NVIDIA (NVENC), with automatic fallback.
-- Says honestly when a video was upscaled.
-
-**Quality checks**
-- Every Short is checked after rendering (size, length, audio, black bars, frozen frames).
-- A failed render is retried with a safer setting.
-
-**Policy and copyright checks**
-- Flags possible copyright, Content ID, music, reused-content, age and advertiser-friendly risks, with links
-  to YouTube's rules. These are warnings, not guarantees.
-
-**YouTube metadata, ready to paste**
-- One `YOUTUBE_METADATA.md` per date. For each Short you get the filename, a Title, and a plain-text
-  Description with the story, related keywords, creator credit with links and hashtags last.
-- Publishing Notes for you: the original timestamp, the risk check and the sound effects used.
-
-**Clean output**
-- `YouTube_Shorts/YYYY-MM-DD/` holds only the `NN_name.mp4` Shorts and the metadata file.
-- Numbering continues across runs on the same day. Internal files stay out of sight.
-
-**Works with your AI agent**
-- Claude (Code and Skills), Codex CLI, Cursor, Gemini CLI, Copilot agent mode and any agent that runs commands.
-- ChatGPT and Gemini web apps can plan, and the engine runs on your computer.
-- Free and local. No paid AI API needed.
-
-**Handy commands**
-- `doctor` (checks your setup), `run`, `more`, `analyze`, `render`, `resume`, `history`, `clean`, `templates`.
+- 🎬 **Any video:** YouTube links or local MP4, MOV, MKV, WebM files.
+- ⚡ **Fast on long videos:** handles even 25-hour streams without downloading the whole video.
+- 🎙️ **Real transcripts:** Whisper listens to the actual audio, no trust in YouTube captions.
+- 🔥 **Finds the best moments:** reactions, laughs, loud spikes and YouTube's "most replayed" parts.
+- 🔁 **Never repeats:** remembers used timestamps, so every new Short is fresh.
+- 🎨 **5 templates:** Gaming, Podcast, Funny, Storytelling, Minimal.
+- 🎮 **Reaction cam:** finds the streamer's cam automatically and shows it whole above the gameplay.
+- 📱 **Smart 9:16 crop:** follows faces and action, no blind centre crops.
+- 💬 **Captions:** word-by-word, synced, 4 styles, never covering faces.
+- 🔊 **Sound effects:** only when the moment needs one, never copyrighted.
+- 📺 **4K export:** 2160×3840 by default, `--1080p` for speed.
+- 🛡️ **Copyright check:** flags possible Content ID and policy risks before you upload.
+- 📝 **Ready-to-paste metadata:** title, description and hashtags for every Short.
+- 🤖 **Works with your AI:** Claude (plugin), Codex, Gemini, Cursor, Copilot. Free and local.
 
 ## Installation
 
