@@ -4,16 +4,7 @@
 
 **Created by Kiran Patil - NeoClip-AI-Skill** · v2.0.0 · © 2026 Kiran Patil. All Rights Reserved.
 
-A cross-agent AI skill that turns long videos (YouTube URLs or local files) into edited, captioned,
-9:16 YouTube Shorts. It also writes publishing metadata and remembers which parts of each video it has
-already used, so it never makes the same Short twice.
-
-- **Works with** Claude (Code / Skills), OpenAI Codex CLI, Cursor, Gemini CLI, Copilot agent mode, and any
-  agent that can read Markdown and run a command. ChatGPT and Gemini web apps can plan, and the engine runs
-  locally. See [`references/agent-compatibility.md`](references/agent-compatibility.md).
-- **No paid AI API needed.** Video work is done by FFmpeg, OpenCV and local Whisper. The agent supplies judgement.
-- **Output stays simple:** each processing date gets its own folder containing only the finished Shorts (`.mp4`)
-  and one `YOUTUBE_METADATA.md` with titles, descriptions and hashtags.
+Turn long videos into ready-to-post YouTube Shorts with your AI agent. Free, local, no paid API.
 
 ## Features
 
@@ -32,233 +23,64 @@ already used, so it never makes the same Short twice.
 - 📝 **Ready-to-paste metadata:** title, description and hashtags for every Short.
 - 🤖 **Works with your AI:** Claude (plugin), Codex, Gemini, Cursor, Copilot. Free and local.
 
-## Installation
+## Install
 
-### Claude Code plugin (easiest for Claude Code)
-
-In Claude Code, run these two commands:
-
+**Claude Code (plugin):**
 ```text
 /plugin marketplace add patil7kp/NeoClip-AI-Skill
 /plugin install neoclip-ai-skill@neoclip-ai
 ```
 
-On Claude Code 2.1.275 or later, this one line does both:
-
+**Any other agent** (Codex, Gemini CLI, Cursor, Copilot): send it this prompt.
 ```text
-/plugin install neoclip-ai-skill --marketplace patil7kp/NeoClip-AI-Skill
+Install the NeoClip-AI-Skill from https://github.com/patil7kp/NeoClip-AI-Skill. Clone it, install FFmpeg and the Python requirements, run "python scripts/cli.py doctor", and set it up as a skill for this agent by following the Install section of its README.
 ```
 
-Then install the tools it uses once (FFmpeg and the Python requirements), as in [Manual install](#manual-install),
-or just ask Claude: "Set up NeoClip-AI-Skill and run its doctor check." Update later with `/plugin update`.
-
-### Quick install (any agent)
-
-Open an AI agent that can use your terminal (Claude Code, Codex CLI, Gemini CLI, Cursor or GitHub Copilot)
-and send it this prompt:
-
-```text
-Install the NeoClip-AI-Skill from https://github.com/patil7kp/NeoClip-AI-Skill. Clone it, install FFmpeg and the Python requirements, run "python scripts/cli.py doctor", and set it up as a skill for this agent by following the Installation section of its README.
-```
-
-**Using the Claude app or claude.ai?** Download the
-[skill zip](https://github.com/patil7kp/NeoClip-AI-Skill/archive/refs/heads/main.zip), open
-**Settings → Capabilities**, turn on code execution, and upload the zip under **Skills**.
+**Claude app / claude.ai:** download the [zip](https://github.com/patil7kp/NeoClip-AI-Skill/archive/refs/heads/main.zip) and upload it in **Settings → Capabilities → Skills**.
 
 ### Manual install
-
-**1. Install Python 3.10+ and FFmpeg**
-
-macOS:
 ```bash
-brew install python ffmpeg
-```
-Windows:
-```powershell
-winget install Python.Python.3.12 Gyan.FFmpeg
-```
-Ubuntu / Debian:
-```bash
-sudo apt install python3 python3-pip ffmpeg
-```
-
-**2. Download the skill and install its packages**
-```bash
+brew install python ffmpeg            # Windows: winget install Python.Python.3.12 Gyan.FFmpeg
 git clone https://github.com/patil7kp/NeoClip-AI-Skill.git
 cd NeoClip-AI-Skill
 python -m pip install -r requirements.txt
+python scripts/cli.py doctor          # should say "ready": true
 ```
 
-**3. Check it's ready** (should print `"ready": true`)
-```bash
-python scripts/cli.py doctor
-```
+| Agent | How to connect |
+|---|---|
+| Claude Code | Plugin (above), or copy the folder to `~/.claude/skills/neoclip-ai-skill` |
+| Codex CLI / Gemini CLI | Run `codex` or `gemini` inside the folder |
+| Cursor / Copilot | Open the folder, use **Agent** mode |
+| ChatGPT / Gemini web | Paste [`platforms/chatgpt-instructions.md`](platforms/chatgpt-instructions.md) (planning only) |
+| Any other agent | "Read SKILL.md and follow it" |
 
-**4. Optional: download the face-tracking model**
-```bash
-python scripts/cli.py setup-models
-```
+## Use it
 
-### Connect it to your agent
-
-| Agent | How to connect | Mode |
-|---|---|---|
-| Claude Code | Copy the folder into your skills folder (command below), then run `claude` | Full |
-| Claude app / claude.ai | Upload the zip in **Settings → Capabilities → Skills** | Planning or full |
-| Codex CLI | Run `codex` inside the `NeoClip-AI-Skill` folder (reads `AGENTS.md`) | Full |
-| Gemini CLI | Run `gemini` inside the `NeoClip-AI-Skill` folder (reads `GEMINI.md`) | Full |
-| Cursor | **File → Open Folder** → `NeoClip-AI-Skill`, then use **Agent** | Full |
-| GitHub Copilot (VS Code) | Open the folder, switch Copilot Chat to **Agent** mode | Full |
-| ChatGPT / Gemini web | Paste [`platforms/chatgpt-instructions.md`](platforms/chatgpt-instructions.md) into a Project or Gem | Planning |
-| Any other agent | Open the folder and say "Read SKILL.md and follow it" | Full |
-
-**Full** means the agent runs everything for you. **Planning** means it picks the moments and writes the
-titles in chat, and you run the `analyze` and `render` commands yourself.
-
-Claude Code skills folder, macOS / Linux:
-```bash
-mkdir -p ~/.claude/skills && cp -r NeoClip-AI-Skill ~/.claude/skills/neoclip-ai-skill
-```
-Windows (PowerShell):
-```powershell
-Copy-Item -Recurse NeoClip-AI-Skill $HOME\.claude\skills\neoclip-ai-skill
-```
-
-Need to install the agent itself first?
-```bash
-npm install -g @openai/codex          # Codex CLI
-npm install -g @google/gemini-cli     # Gemini CLI
-```
-For Claude Code, see the [official setup guide](https://docs.anthropic.com/en/docs/claude-code/setup).
-More detail per agent: [`platforms/`](platforms/) and [`references/agent-compatibility.md`](references/agent-compatibility.md).
-
-## Use it (through your agent)
-Ask in plain words, for example:
+Just ask your agent:
 ```text
 Make 3 Shorts from https://youtu.be/XXXXXXXXXXX with the gaming template. It's my own stream.
 ```
 ```text
 Give me 2 more Shorts from that same video.
 ```
-```text
-Switch to the podcast template and turn off uppercase captions.
-```
 
-## Use it (directly)
+Or run it yourself:
 ```bash
 python scripts/cli.py run ~/Videos/stream.mp4 --rights own --template gaming-reaction --count 3
-python scripts/cli.py more ~/Videos/stream.mp4 --rights own --count 2        # new moments only
-python scripts/cli.py analyze "https://youtu.be/XXXXXXXXXXX" --rights own > candidates.json
-python scripts/cli.py render --plan plan.json                                 # agent- or hand-written plan
-python scripts/cli.py resume                                                  # finish an interrupted run
-python scripts/cli.py history show ~/Videos/stream.mp4
+python scripts/cli.py more ~/Videos/stream.mp4 --rights own --count 2
+python scripts/cli.py resume
 ```
-Templates:
-```bash
-python scripts/cli.py templates list
-python scripts/cli.py templates use gaming-reaction
-python scripts/cli.py templates set gaming-reaction captions.uppercase=false
-python scripts/cli.py templates reset gaming-reaction
-```
-Quality: Shorts export in **4K (2160×3840)** by default. Add `--1080p` for a 1080×1920 export that renders about
-4× faster. If the source is smaller than 4K, the result says it was upscaled.
+Add `--1080p` for faster renders, or `--range 2:00:00-6:00:00` to search only part of a long video.
 
-## Gaming reaction videos
-The `gaming-reaction` template finds the reaction cam on its own. It works with a normal webcam, a cam with a
-border, a cam in a corner, and any picture-in-picture reaction overlay, even when no face is visible. The whole
-cam is shown in the top panel (never cut off) and the gameplay fills the rest.
+## Good to know
 
-## Sound effects
-Sound effects are added only when a moment really calls for one, and skipped otherwise:
-- laughter → a laugh, a surprise or shock → a short boom, a big reaction spike → a soft hit.
-- At most 1 or 2 per Short, quiet, under the original audio. Podcast and minimal templates use none.
-- By default the engine uses its own built-in effects (made with FFmpeg, no copyright).
-- To use your own sounds, put **generic, cleared** files in `~/NeoClip-SFX/cleared/` and name them by type
-  (`laugh_1.mp3`, `boom.wav`, `hit_soft.mp3`). You can browse [Myinstants](https://www.myinstants.com/en/index/in/)
-  yourself and save only generic, royalty-free effects there. The engine never downloads sounds by itself
-  (the site's terms don't allow automated access).
-- **No copyrighted sounds.** Files whose name points to a movie, TV show, song, game or brand are skipped.
-  When in doubt, the engine uses a built-in effect or none. Every sound used is listed in the Short's
-  Publishing Notes.
+- **Long videos:** YouTube videos are never downloaded in full. Audio comes in 1-hour batches, and only the chosen clips are downloaded.
+- **Sound effects:** added only when a moment needs one. To use your own, put generic, copyright-free files in `~/NeoClip-SFX/cleared/`.
+- **Output:** `YouTube_Shorts/YYYY-MM-DD/` with the Shorts and one `YOUTUBE_METADATA.md` ([example](examples/example-metadata.md)).
+- **Rights:** only use videos you own or have permission for. Copyright checks are warnings, not guarantees.
 
-## YOUTUBE_METADATA.md
-Made for copy and paste. Each Short has only its filename, a **Title** box, a **Description** box (plain text:
-the full story, related keywords, creator credit with links, hashtags on the last line) and **Publishing Notes**
-for you (timestamp, risk check, sound effects used). See [the example](examples/example-metadata.md).
-
-## Long YouTube videos (fast mode)
-
-YouTube videos are **never downloaded in full** by default. Instead the engine:
-
-1. Reads the video's details and YouTube's "most replayed" graph (no download).
-2. Fetches low-quality audio in **1-hour batches**, 3 at a time. Each batch gets a loudness pass and a
-   **Whisper transcript of the real audio**, then its audio file is deleted. Results are saved per batch, so a
-   stopped run continues from the last finished batch.
-3. Picks the best moments from the transcript, the loudness and the replay graph.
-4. Downloads **only the chosen clips** in full quality, in parallel, while earlier clips render. Each clip file
-   is deleted once its Short is saved.
-
-YouTube's own captions are not used unless you ask for them with `--youtube-captions`.
-
-**Rough estimates for a 25-hour stream** (not measured on a real 25-hour video; depends on your connection
-and computer):
-
-| Step | Time | Disk space |
-|---|---|---|
-| Video details + replay graph | seconds | none |
-| Audio, 25 batches | about 5–20 min to download, 1–3 min to analyse | under 100 MB at any moment |
-| Whisper, default for videos over 3 hours: only the strongest moments | about 2–10 min | small |
-| Whisper, `--transcribe full`: every hour | about 2.5–4 h on a modern CPU (small model), 1–2 h with `--whisper-model base`, 20–60 min on an NVIDIA GPU | small |
-| Each chosen clip | under a minute to download | about 20–60 MB per clip at 4K, deleted afterwards |
-| Rendering | about 1 min per Short with a hardware encoder, several minutes with x264 at 4K | the finished Shorts |
-
-The old way downloaded the whole video first (often 10–50 GB for 25 hours at 4K) before anything else could start.
-
-Useful options:
-```bash
-python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --rights own --range 2:00:00-6:00:00   # only search part of it
-python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --rights own --transcribe full          # Whisper every hour
-python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --rights own --whisper-model base       # faster Whisper
-python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --rights own --workers 5                # more parallel downloads
-python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --rights own --full-download            # old behaviour
-```
-
-Rendering uses Apple VideoToolbox or NVIDIA NVENC automatically when FFmpeg has them, and falls back to x264 if
-they fail. For the highest quality at the cost of speed, set `"hw_encoder": "off"` in the config.
-
-## Configuration
-Optional `~/.neoclip-ai-skill/config.json` (all keys: `scripts/config.py`):
-```json
-{"output_root": "~/Videos/YouTube_Shorts", "resolution": "2160x3840", "whisper_model": "small",
- "caption_corrections": {"valorent": "Valorant"}, "music_library": "~/Music/licensed/music_library.json",
- "ai": {"command": null}}
-```
-Environment: `YT_SHORTS_STATE_DIR`, `YT_SHORTS_OUTPUT_ROOT`, `YT_SHORTS_RESOLUTION`, `YT_SHORTS_WHISPER_MODEL`,
-`YT_SHORTS_AI_COMMAND`, `YT_SHORTS_MUSIC_LIBRARY`.
-
-## Tests
-```bash
-python -m pytest -q      # 80 tests, about 1 minute, needs FFmpeg
-```
-
-## Honest limitations
-- **Moment detection** uses signals (loudness, motion, cue words, faces). It's good at finding energy and
-  reactions, but it doesn't understand jokes or stories. That's why the agent reviews the excerpts.
-- **Speaker detection** is approximate (dominant or persistent face plus two-shot). It doesn't use lip activity.
-- **Face detection**: Haar (OpenCV 4) misses profiles and small faces. YuNet (`setup-models`) is better.
-- **Music detection** is a heuristic for "possible music". It does not identify songs. Content ID is the real test.
-- **Policy screening** can't see visual nudity or gore and can't judge fair use. It flags potential risks and
-  is not legal advice.
-- **4K**: most sources are upscaled when converted to 9:16 4K. Every result says so.
-- **Fast mode framing** checks faces and the facecam inside each downloaded clip, not across the whole video.
-  Use `--full-download` if a template needs whole-video visual analysis.
-- **YouTube downloads** depend on yt-dlp and YouTube's current behaviour. Private, age-gated, members-only or
-  region-blocked videos are not supported and are not bypassed.
-
-## Responsible use
-Process only videos you own or have permission to use. Credit doesn't replace permission. Follow YouTube's
-Terms of Service and Community Guidelines. The skill offers no guarantees about claims, strikes,
-monetization or reach. YouTube makes those decisions.
+More: [details, options and limitations](references/details.md) · [agent setup](references/agent-compatibility.md) · [changelog](CHANGELOG.md)
 
 ## Author & Copyright Information
 
