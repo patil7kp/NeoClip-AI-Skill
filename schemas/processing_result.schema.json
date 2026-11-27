@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "processing_result.schema.json",
+  "title": "Result of a run/render/resume command",
+  "type": "object",
+  "required": ["status", "video_id"],
+  "properties": {
+    "status": {"enum": ["completed", "partial", "failed", "dry_run", "nothing_to_do", "analyzed", "nothing_to_resume", "error"]},
+    "job_id": {"type": "string"},
+    "video_id": {"type": "string"},
+    "template": {"type": "string"},
+    "caption_preset": {"type": "string"},
+    "output_folder": {"type": "string"},
+    "metadata_file": {"type": ["string", "null"]},
+    "generated": {"type": "integer"},
+    "failed": {"type": "integer"},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "policy_review_due": {"type": "boolean"},
+    "clips": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["status", "source_range", "source_timestamp"],
+        "properties": {
+          "status": {"enum": ["completed", "failed"]},
+          "clip_id": {"type": "string"},
+          "index": {"type": "integer"},
+          "filename": {"type": "string"},
+          "output_path": {"type": "string"},
+          "label": {"type": "string"},
+          "source_range": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
+          "source_timestamp": {"type": "string"},
+          "output_duration": {"type": "number"},
+          "title": {"type": "string"},
+          "hashtags": {"type": "array", "items": {"type": "string"}},
+          "metadata_source": {"enum": ["agent", "ai", "heuristic"]},
+          "layout": {"enum": ["gaming_stack", "face_track", "subject_track", "fit_blur"]},
+          "resolution": {"type": "string"},
+          "resolution_note": {"type": "string"},
+          "risk": {"type": "object", "properties": {"overall": {"enum": ["low", "medium", "high"]}, "items": {"type": "array"}}},
+          "validation": {"type": "object", "properties": {"passed": {"type": "boolean"}}},
+          "warnings": {"type": "array", "items": {"type": "string"}},
+          "error": {"type": "string"},
+          "hint": {"type": "string"}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,7 @@
+---
+description: Use when the user wants YouTube Shorts, clips or highlights made from a video (YouTube URL or local file), more Shorts from a video processed before, or Shorts editing templates.
+alwaysApply: false
+---
+Follow @SKILL.md in the workspace root of the neoclip-ai folder. Run the engine in the terminal
+with `python scripts/cli.py`. Confirm the user's rights to the video before processing (`--rights`). Report only what
+the JSON result says, and never promise policy or copyright outcomes.

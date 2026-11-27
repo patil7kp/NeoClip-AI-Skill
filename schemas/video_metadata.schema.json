@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "video_metadata.schema.json",
+  "title": "Normalized source video metadata",
+  "description": "Produced by scripts/source_input.py for both YouTube URLs and local files.",
+  "type": "object",
+  "required": ["kind", "video_id", "title", "duration"],
+  "properties": {
+    "kind": {"enum": ["youtube", "local"]},
+    "video_id": {"type": "string", "pattern": "^(yt-[A-Za-z0-9_-]{11}|local-[0-9a-f]{16})$"},
+    "youtube_id": {"type": "string"},
+    "url": {"type": ["string", "null"]},
+    "title": {"type": "string"},
+    "creator": {"type": ["string", "null"]},
+    "channel_url": {"type": ["string", "null"]},
+    "duration": {"type": "number", "exclusiveMinimum": 0},
+    "local_path": {"type": "string"},
+    "rights": {"enum": ["own", "permission", "licensed", "creative-commons", "public-domain"]},
+    "upload_date": {"type": ["string", "null"]},
+    "tags": {"type": "array", "items": {"type": "string"}},
+    "license": {"type": ["string", "null"]},
+    "age_limit": {"type": "integer"},
+    "chapters": {"type": "array"},
+    "probe": {
+      "type": "object",
+      "properties": {
+        "duration": {"type": "number"}, "width": {"type": "integer"}, "height": {"type": "integer"},
+        "fps": {"type": "number"}, "video_codec": {"type": ["string", "null"]}, "has_audio": {"type": "boolean"},
+        "audio_codec": {"type": ["string", "null"]}, "sample_rate": {"type": "integer"}, "channels": {"type": "integer"}
+      }
+    }
+  }
+}
