@@ -33,7 +33,27 @@ already used, so it never makes the same Short twice.
 
 ## Installation
 
-Installing takes two steps: set up the engine once on your computer, then connect it to the AI agent you use.
+Use the quick install if you just want it working. The manual steps after it explain each agent in detail.
+
+### Quick install (easiest)
+
+**Option A: let your AI agent install it.** Open an agent that can use your terminal (Claude Code, Codex CLI,
+Gemini CLI, Cursor or Copilot agent mode), copy this message, and send it:
+
+> Install the NeoClip-AI-Skill from https://github.com/patil7kp/NeoClip-AI-Skill for me. Clone it, install
+> FFmpeg and the Python requirements, run `python scripts/cli.py doctor`, and set it up as a skill for
+> this agent by following the Installation section of its README.
+
+The agent does the rest and asks before running each command.
+
+**Option B: add it in your app's settings (Claude app and claude.ai).**
+1. Download the skill: [NeoClip-AI-Skill.zip](https://github.com/patil7kp/NeoClip-AI-Skill/archive/refs/heads/main.zip)
+   (or click **Code → Download ZIP** on this page).
+2. In Claude, open **Settings → Capabilities**, make sure code execution is on, and upload the zip under
+   **Skills**.
+3. Start a new chat and ask for Shorts. Claude picks up the skill automatically.
+
+Prefer to do it by hand, or using a different agent? Follow the two steps below.
 
 ### Step 1: Set up the engine (everyone does this once)
 
@@ -98,8 +118,8 @@ give the agent a Bash tool. See [`platforms/claude.md`](platforms/claude.md).
 
 #### Gemini web app (planning)
 1. Create a **Gem**.
-2. Paste the instructions from [`platforms/gemini-instructions.md`](platforms/gemini-instructions.md) and upload
-   the same knowledge files listed for ChatGPT.
+2. Paste the same instructions used for ChatGPT ([`platforms/chatgpt-instructions.md`](platforms/chatgpt-instructions.md))
+   and upload the same knowledge files.
 3. Chat with it, and run `analyze` and `render` on your computer when it asks.
 
 #### Cursor (full)
