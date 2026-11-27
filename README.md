@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/banner.png" alt="NeoClip-AI-Skill banner" width="100%"></p>
+
 # NeoClip-AI-Skill
 
 **Created by Kiran Patil - NeoClip-AI-Skill** · v1.0.0 · © 2026 Kiran Patil. All Rights Reserved.
