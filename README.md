@@ -33,119 +33,97 @@ already used, so it never makes the same Short twice.
 
 ## Installation
 
-Use the quick install if you just want it working. The manual steps after it explain each agent in detail.
+### Quick install (recommended)
 
-### Quick install (easiest)
+Open an AI agent that can use your terminal (Claude Code, Codex CLI, Gemini CLI, Cursor or GitHub Copilot)
+and send it this prompt:
 
-**Option A: let your AI agent install it.** Open an agent that can use your terminal (Claude Code, Codex CLI,
-Gemini CLI, Cursor or Copilot agent mode), copy this message, and send it:
+```text
+Install the NeoClip-AI-Skill from https://github.com/patil7kp/NeoClip-AI-Skill. Clone it, install FFmpeg and the Python requirements, run "python scripts/cli.py doctor", and set it up as a skill for this agent by following the Installation section of its README.
+```
 
-> Install the NeoClip-AI-Skill from https://github.com/patil7kp/NeoClip-AI-Skill for me. Clone it, install
-> FFmpeg and the Python requirements, run `python scripts/cli.py doctor`, and set it up as a skill for
-> this agent by following the Installation section of its README.
+**Using the Claude app or claude.ai?** Download the
+[skill zip](https://github.com/patil7kp/NeoClip-AI-Skill/archive/refs/heads/main.zip), open
+**Settings → Capabilities**, turn on code execution, and upload the zip under **Skills**.
 
-The agent does the rest and asks before running each command.
+### Manual install
 
-**Option B: add it in your app's settings (Claude app and claude.ai).**
-1. Download the skill: [NeoClip-AI-Skill.zip](https://github.com/patil7kp/NeoClip-AI-Skill/archive/refs/heads/main.zip)
-   (or click **Code → Download ZIP** on this page).
-2. In Claude, open **Settings → Capabilities**, make sure code execution is on, and upload the zip under
-   **Skills**.
-3. Start a new chat and ask for Shorts. Claude picks up the skill automatically.
+**1. Install Python 3.10+ and FFmpeg**
 
-Prefer to do it by hand, or using a different agent? Follow the two steps below.
+macOS:
+```bash
+brew install python ffmpeg
+```
+Windows:
+```powershell
+winget install Python.Python.3.12 Gyan.FFmpeg
+```
+Ubuntu / Debian:
+```bash
+sudo apt install python3 python3-pip ffmpeg
+```
 
-### Step 1: Set up the engine (everyone does this once)
+**2. Download the skill and install its packages**
+```bash
+git clone https://github.com/patil7kp/NeoClip-AI-Skill.git
+cd NeoClip-AI-Skill
+python -m pip install -r requirements.txt
+```
 
-1. Install **Python 3.10 or newer** from [python.org](https://www.python.org/downloads/).
-2. Install **FFmpeg** (it must include libass, which the standard builds below do):
-   - macOS: `brew install ffmpeg`
-   - Windows: `winget install Gyan.FFmpeg`
-   - Ubuntu / Debian: `sudo apt install ffmpeg`
-3. Download the skill and install its Python packages:
-   ```bash
-   git clone https://github.com/patil7kp/NeoClip-AI-Skill.git
-   cd NeoClip-AI-Skill
-   python -m pip install -r requirements.txt
-   ```
-4. Check that everything is ready:
-   ```bash
-   python scripts/cli.py doctor          # should print "ready": true
-   python scripts/cli.py setup-models    # optional: downloads the face-tracking model
-   ```
+**3. Check it's ready** (should print `"ready": true`)
+```bash
+python scripts/cli.py doctor
+```
 
-### Step 2: Connect it to your AI agent
+**4. Optional: download the face-tracking model**
+```bash
+python scripts/cli.py setup-models
+```
 
-Pick the agent you use. Agents marked **full** run the engine for you. Agents marked **planning** choose the
-moments and write the titles in chat, and you run two commands yourself.
+### Connect it to your agent
 
-#### Claude Code (full)
-1. Install Claude Code: see the [official setup guide](https://docs.anthropic.com/en/docs/claude-code/setup).
-2. Copy the skill into your skills folder:
-   - macOS / Linux: `cp -r NeoClip-AI-Skill ~/.claude/skills/neoclip-ai-skill`
-   - Windows (PowerShell): `Copy-Item -Recurse NeoClip-AI-Skill $HOME\.claude\skills\neoclip-ai-skill`
-3. Start `claude` in any folder and ask: *"Make 3 Shorts from ~/Videos/stream.mp4. It's my own video."*
-   Claude loads the skill automatically.
+| Agent | How to connect | Mode |
+|---|---|---|
+| Claude Code | Copy the folder into your skills folder (command below), then run `claude` | Full |
+| Claude app / claude.ai | Upload the zip in **Settings → Capabilities → Skills** | Planning or full |
+| Codex CLI | Run `codex` inside the `NeoClip-AI-Skill` folder (reads `AGENTS.md`) | Full |
+| Gemini CLI | Run `gemini` inside the `NeoClip-AI-Skill` folder (reads `GEMINI.md`) | Full |
+| Cursor | **File → Open Folder** → `NeoClip-AI-Skill`, then use **Agent** | Full |
+| GitHub Copilot (VS Code) | Open the folder, switch Copilot Chat to **Agent** mode | Full |
+| ChatGPT / Gemini web | Paste [`platforms/chatgpt-instructions.md`](platforms/chatgpt-instructions.md) into a Project or Gem | Planning |
+| Any other agent | Open the folder and say "Read SKILL.md and follow it" | Full |
 
-#### Claude desktop app and claude.ai (planning, sometimes full)
-1. Zip the `NeoClip-AI-Skill` folder.
-2. In Claude, open **Settings → Capabilities**, turn on code execution, then upload the zip under **Skills**.
-3. Ask for Shorts as usual. Claude's online sandbox may not have FFmpeg or internet access, so if
-   `doctor` is not ready there, Claude switches to planning mode: you run `analyze` and `render` on your
-   computer and upload the JSON files it asks for.
+**Full** means the agent runs everything for you. **Planning** means it picks the moments and writes the
+titles in chat, and you run the `analyze` and `render` commands yourself.
 
-#### Claude Agent SDK (full)
-Point the SDK's skills directory at the `NeoClip-AI-Skill` folder, or load `SKILL.md` as the system prompt and
-give the agent a Bash tool. See [`platforms/claude.md`](platforms/claude.md).
+Claude Code skills folder, macOS / Linux:
+```bash
+mkdir -p ~/.claude/skills && cp -r NeoClip-AI-Skill ~/.claude/skills/neoclip-ai-skill
+```
+Windows (PowerShell):
+```powershell
+Copy-Item -Recurse NeoClip-AI-Skill $HOME\.claude\skills\neoclip-ai-skill
+```
 
-#### OpenAI Codex CLI (full)
-1. Install Codex CLI: `npm install -g @openai/codex` (needs Node.js 18+), then sign in when it asks.
-2. Open a terminal in the `NeoClip-AI-Skill` folder and run `codex`.
-3. Codex reads `AGENTS.md` automatically. Ask for your Shorts and approve the commands when it asks.
-
-#### ChatGPT (planning)
-1. Create a **Project** (or a Custom GPT).
-2. Paste the instructions from [`platforms/chatgpt-instructions.md`](platforms/chatgpt-instructions.md) into its
-   instructions box.
-3. Upload these files as project knowledge: `SKILL.md`, `templates/*.md`, `references/clip-selection.md`,
-   `references/youtube-policies.md`, `references/output-guidelines.md`.
-4. Chat with it. It tells you when to run `analyze` and `render` on your computer and what to upload.
-
-#### Gemini CLI (full)
-1. Install Gemini CLI: `npm install -g @google/gemini-cli` (needs Node.js 18+), then sign in with Google.
-2. Open a terminal in the `NeoClip-AI-Skill` folder and run `gemini`.
-3. Gemini reads `GEMINI.md`, which loads the skill. Approve the commands when it asks.
-
-#### Gemini web app (planning)
-1. Create a **Gem**.
-2. Paste the same instructions used for ChatGPT ([`platforms/chatgpt-instructions.md`](platforms/chatgpt-instructions.md))
-   and upload the same knowledge files.
-3. Chat with it, and run `analyze` and `render` on your computer when it asks.
-
-#### Cursor (full)
-1. Open the `NeoClip-AI-Skill` folder in Cursor (**File → Open Folder**).
-2. The rule in `.cursor/rules/neoclip-ai-skill.mdc` loads when you ask Cursor's **Agent** for Shorts.
-3. Approve the terminal commands. Rendering can take a few minutes, so let long commands finish.
-
-#### GitHub Copilot in VS Code (full)
-1. Install the **GitHub Copilot** and **GitHub Copilot Chat** extensions and sign in.
-2. Open the `NeoClip-AI-Skill` folder in VS Code.
-3. Open Copilot Chat, switch the mode to **Agent**, and ask for your Shorts. Copilot reads `AGENTS.md`
-   (if it doesn't, check that the *Use AGENTS.md file* setting is on, or attach `SKILL.md` to the chat).
-4. Approve the terminal commands when it asks.
-
-#### Any other agent (Windsurf, Cline, Aider and similar)
-If the agent can read files and run terminal commands, open the `NeoClip-AI-Skill` folder and tell it:
-*"Read SKILL.md and follow it."* If it can only chat, use the ChatGPT planning steps above.
-
-More detail on what each agent can and can't do: [`references/agent-compatibility.md`](references/agent-compatibility.md).
+Need to install the agent itself first?
+```bash
+npm install -g @openai/codex          # Codex CLI
+npm install -g @google/gemini-cli     # Gemini CLI
+```
+For Claude Code, see the [official setup guide](https://docs.anthropic.com/en/docs/claude-code/setup).
+More detail per agent: [`platforms/`](platforms/) and [`references/agent-compatibility.md`](references/agent-compatibility.md).
 
 ## Use it (through your agent)
-> "Make 3 Shorts from https://youtu.be/XXXXXXXXXXX with the gaming template. It's my own stream."
->
-> "Give me 2 more Shorts from that same video."
->
-> "Switch to the podcast template and turn off uppercase captions."
+Ask in plain words, for example:
+```text
+Make 3 Shorts from https://youtu.be/XXXXXXXXXXX with the gaming template. It's my own stream.
+```
+```text
+Give me 2 more Shorts from that same video.
+```
+```text
+Switch to the podcast template and turn off uppercase captions.
+```
 
 ## Use it (directly)
 ```bash
@@ -155,7 +133,13 @@ python scripts/cli.py analyze "https://youtu.be/XXXXXXXXXXX" --rights own > cand
 python scripts/cli.py render --plan plan.json                                 # agent- or hand-written plan
 python scripts/cli.py resume                                                  # finish an interrupted run
 python scripts/cli.py history show ~/Videos/stream.mp4
-python scripts/cli.py templates list | use <id> | set <id> key=value | reset <id>
+```
+Templates:
+```bash
+python scripts/cli.py templates list
+python scripts/cli.py templates use gaming-reaction
+python scripts/cli.py templates set gaming-reaction captions.uppercase=false
+python scripts/cli.py templates reset gaming-reaction
 ```
 Speed: `--resolution 1080x1920` renders about 4× faster than the 4K default.
 
@@ -171,7 +155,7 @@ Environment: `YT_SHORTS_STATE_DIR`, `YT_SHORTS_OUTPUT_ROOT`, `YT_SHORTS_RESOLUTI
 
 ## Tests
 ```bash
-python -m pytest -q      # 66 tests, about 1 minute, needs FFmpeg
+python -m pytest -q      # 67 tests, about 1 minute, needs FFmpeg
 ```
 
 ## Honest limitations

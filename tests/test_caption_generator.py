@@ -60,3 +60,13 @@ def test_hook_never_covers_facecam_in_gaming_layout():
     face_lay = {"mode": "face_track", "faces_out": [(0.08, 0.15, 0.24)]}
     y = hook_position(face_lay, 0.70, 0.045)
     assert not 0.04 <= y <= 0.28
+
+
+def test_template_caption_style_setting(isolated_state):
+    import pytest
+    from scripts.common import InputError
+    from scripts.templates_config import customize_template
+    t = customize_template("gaming-reaction", ["captions.uppercase=false"])
+    assert t["captions"]["overrides"]["uppercase"] is False
+    with pytest.raises(InputError):
+        customize_template("gaming-reaction", ["captions.not_a_style=1"])

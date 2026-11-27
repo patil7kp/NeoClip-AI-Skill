@@ -83,6 +83,12 @@ def customize_template(template_id: str, assignments: list[str]) -> dict:
             raise InputError(f"Bad setting '{item}'.", "Use dotted.key=value, e.g. captions.uppercase=false")
         key, raw = item.split("=", 1)
         parts = key.strip().split(".")
+        # Caption style keys (e.g. captions.uppercase) live under captions.overrides.
+        if parts[0] == "captions" and parts[-1] not in base.get("captions", {}) and len(parts) in (2, 3):
+            from scripts.caption_generator import PRESETS
+            if (len(parts) == 2 or parts[1] == "overrides") and any(parts[-1] in p for p in PRESETS.values()):
+                parts = ["captions", "overrides", parts[-1]]
+                base.setdefault("captions", {}).setdefault("overrides", {}).setdefault(parts[2], None)
         probe = base
         for p in parts[:-1]:
             if not isinstance(probe, dict) or p not in probe:
