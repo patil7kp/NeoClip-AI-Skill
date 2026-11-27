@@ -113,6 +113,9 @@ Details: `templates/<id>.md`.
 `--resolution 1080x1920` renders much faster (the default target is 2160x3840).
 `--output-root DIR` sets where the date folders go (default `./YouTube_Shorts`).
 `--subtitles file.srt` skips Whisper.
+YouTube input never downloads the whole video: audio comes in 1-hour batches and only the chosen clips are
+downloaded. For very long videos suggest `--range START-END`; `--transcribe full` makes Whisper cover every
+hour (slow on CPU), and `--full-download` restores the old behaviour.
 `--whisper-model base|small|medium|large-v3` and `--language xx` control transcription.
 `--caption-preset bold_pop|clean_pro|story|minimal` sets the caption style; it stays fixed per source
 video, so all its Shorts match.

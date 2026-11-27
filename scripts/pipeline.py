@@ -51,21 +51,45 @@ class Pipeline:
         if remember_template and template_id:
             update_preferences(template=template["id"])
         wd = work_dir(source["video_id"])
-        if source["kind"] == "youtube":
-            path = source_input.download_youtube(source, wd / "download", int(self.cfg["download_max_height"]))
-            source["local_path"] = str(path)
-        meta = video_analyzer.probe(source["local_path"])
-        source["duration"] = meta["duration"] or source["duration"]
+        fast = source["kind"] == "youtube" and self.cfg.get("youtube_mode", "fast") != "full"
+        if fast:
+            # No full download: analysis uses captions, the replay heatmap and chunked audio; only the
+            # chosen clip ranges are downloaded (at full quality) when they are rendered.
+            meta = {"duration": source["duration"], "width": int(source.get("width") or 1920),
+                    "height": int(source.get("height") or 1080), "fps": float(source.get("fps") or 30.0),
+                    "has_audio": True, "partial": True}
+        else:
+            if source["kind"] == "youtube":
+                path = source_input.download_youtube(source, wd / "download", int(self.cfg["download_max_height"]))
+                source["local_path"] = str(path)
+            meta = video_analyzer.probe(source["local_path"])
+            source["duration"] = meta["duration"] or source["duration"]
         rec = self.store.ensure(source)
         recovered = self.store.recover_interrupted(source["video_id"])
         if recovered:
             log(f"Recovered {len(recovered)} interrupted clip(s) from an earlier run (not counted as used).")
         return {"source": source, "meta": meta, "template": template, "work": wd, "history": rec,
-                "recovered": recovered}
+                "recovered": recovered, "fast": fast}
+
+    def analysis_range(self, duration: float) -> tuple[float, float]:
+        rng = self.cfg.get("analyze_range")
+        if not rng:
+            return 0.0, duration
+        a, b = (parse_ts(x) if isinstance(x, str) else float(x) for x in rng)
+        a, b = max(0.0, a), min(duration, b) if b > 0 else duration
+        if b - a < 5:
+            raise InputError(f"--range {rng} is too short or outside the video ({fmt_ts(duration)} long).")
+        return a, b
+
+    def excluded_by_range(self, duration: float) -> list[list[float]]:
+        a, b = self.analysis_range(duration)
+        return [x for x in ([0.0, a], [b, duration]) if x[1] - x[0] > 0]
 
     # ------------------------------------------------------------------ analyze
     def analyze(self, ctx: dict, *, subtitles: str | None = None, transcribe: bool = True,
                 count: int = 3) -> dict:
+        if ctx.get("fast"):
+            return self._analyze_fast(ctx, subtitles=subtitles, transcribe=transcribe, count=count)
         src, meta, wd = ctx["source"], ctx["meta"], ctx["work"]
         warnings: list[str] = []
         visual = read_json(wd / "visual.json")
@@ -95,7 +119,8 @@ class Pipeline:
             need_ranges = None
             if scope == "candidates":
                 pre = clip_selector.select_clips(meta["duration"], visual, audio, None, ctx["template"],
-                                                 self.store.used_segments(src["video_id"]), count,
+                                                 self.store.used_segments(src["video_id"])
+                                                 + self.excluded_by_range(meta["duration"]), count,
                                                  candidate_pool=max(12, count * 4))
                 need_ranges = [[max(0.0, c["start"] - 20), min(meta["duration"], c["end"] + 20)]
                                for c in pre["candidates"]]
@@ -122,14 +147,192 @@ class Pipeline:
         analysis = {"visual": visual, "audio": audio, "transcript": transcript, "warnings": warnings}
         return analysis
 
+    # ------------------------------------------------------------------ analyze (fast YouTube mode)
+    def _analyze_fast(self, ctx: dict, *, subtitles: str | None, transcribe: bool, count: int) -> dict:
+        """Analyse a YouTube video without downloading the video itself.
+
+        The audio is fetched in batches (`audio_chunk_minutes`, low bitrate), several downloads in parallel.
+        Each batch gets a loudness/pause pass and, in full-transcript mode, a Whisper pass, then its
+        audio is deleted. Results are saved per batch, so disk use stays at a few batches and an
+        interrupted run continues from the last finished batch. YouTube's own captions are NOT used
+        unless `youtube_captions` is turned on: the transcript comes from the real audio.
+        """
+        src, meta, wd = ctx["source"], ctx["meta"], ctx["work"]
+        dur = meta["duration"]
+        a, b = self.analysis_range(dur)
+        warnings: list[str] = []
+        heatmap = src.get("heatmap") or []
+        transcript = transcription.load_subtitles(subtitles) if subtitles else None
+        if transcript is None and self.cfg.get("youtube_captions"):
+            subs = source_input.download_youtube_subtitles(src, wd / "subs", self.cfg.get("language"))
+            if subs:
+                try:
+                    transcript = transcription.load_subtitles(subs)
+                except TranscriptionError:
+                    transcript = None
+        scope = self.cfg["transcribe_scope"]
+        if scope == "auto":
+            scope = "full" if (b - a) <= float(self.cfg.get("full_transcribe_max_hours", 3)) * 3600 else "candidates"
+        whisper_ok = transcribe and transcript is None and transcription.available_backend() is not None
+        if transcribe and transcript is None and not whisper_ok:
+            warnings.append("Whisper is not installed (pip install faster-whisper), so Shorts will have no captions.")
+        audio, transcript_full = self._chunked_audio(src, wd, a, b, whisper=whisper_ok and scope == "full",
+                                                     warnings=warnings)
+        transcript = transcript or transcript_full
+        visual = video_analyzer.empty_visual(self.cfg["analysis_fps"])
+        if transcript is None and whisper_ok and scope == "candidates":
+            warnings.append(f"Long video ({fmt_ts(b - a)}): Whisper transcribed the strongest moments found by "
+                            "the loudness/replay pass, not every hour. Set transcribe_scope to 'full' to "
+                            "transcribe everything (much slower).")
+            transcript = self._transcribe_candidates(ctx, audio, visual, heatmap, count, warnings)
+        msg = "Fast mode: the full video was not downloaded; only the chosen clips are fetched in full quality."
+        if not heatmap:
+            msg += " YouTube has no 'most replayed' data for this video, so selection uses audio and speech."
+        warnings.append(msg)
+        return {"visual": visual, "audio": audio, "transcript": transcript, "warnings": warnings,
+                "heatmap": heatmap}
+
+    def _chunks(self, a: float, b: float) -> list[tuple[float, float]]:
+        size = max(60.0, float(self.cfg.get("audio_chunk_minutes") or 60) * 60)
+        out, t = [], a
+        while t < b - 0.5:
+            out.append((round(t, 3), round(min(b, t + size), 3)))
+            t += size
+        return out
+
+    def _whisper(self, path, offset: float) -> dict:
+        tr = transcription.transcribe(path, self.cfg["whisper_model"], self.cfg["language"],
+                                      device=self.cfg["whisper_device"],
+                                      compute_type=self.cfg["whisper_compute_type"],
+                                      beam_size=int(self.cfg.get("whisper_beam_size", 5)))
+        tr["segments"] = [{**seg, "start": round(seg["start"] + offset, 3), "end": round(seg["end"] + offset, 3),
+                           "words": [{**w, "start": round(w["start"] + offset, 3), "end": round(w["end"] + offset, 3)}
+                                     for w in seg.get("words", [])]} for seg in tr["segments"]]
+        return tr
+
+    def _chunked_audio(self, src: dict, wd: Path, a: float, b: float, *, whisper: bool,
+                       warnings: list[str]) -> tuple[dict, dict | None]:
+        """Batch pipeline: downloads run ahead in parallel (bounded window), loudness analysis runs in the
+        download workers, Whisper runs one batch at a time (it already uses every CPU core / the GPU)."""
+        from concurrent.futures import ThreadPoolExecutor
+        cdir = wd / "audio_chunks"
+        cdir.mkdir(parents=True, exist_ok=True)
+        chunks = self._chunks(a, b)
+        model = self.cfg["whisper_model"]
+
+        def names(rng):
+            s, e = rng
+            return cdir / f"chunk_{s:.0f}_{e:.0f}.json", cdir / f"chunk_{s:.0f}_{e:.0f}.whisper_{model}.json"
+
+        def fetch(rng):
+            s, e = rng
+            aj, tj = names(rng)
+            part = read_json(aj)
+            part = part if part and part.get("_v") == ANALYSIS_VERSION else None
+            need_tr = whisper and not tj.exists()
+            if part and not need_tr:
+                return part, None
+            path = source_input.download_youtube_audio_section(src, cdir, s, e)
+            if part is None:
+                m = video_analyzer.probe(path, require_video=False)
+                part = audio_analyzer.shift_audio(audio_analyzer.analyze_audio(path, m), s)
+                part["_v"] = ANALYSIS_VERSION
+                atomic_write_json(aj, part)
+            if not need_tr:
+                Path(path).unlink(missing_ok=True)
+                return part, None
+            return part, path
+
+        done = sum(1 for c in chunks if names(c)[0].exists() and (not whisper or names(c)[1].exists()))
+        workers = max(1, int(self.cfg.get("download_workers") or 1))
+        log(f"Audio: {len(chunks)} batch(es) of up to {self.cfg.get('audio_chunk_minutes', 60)} min, "
+            f"{done} already done{', with Whisper' if whisper else ''} ...")
+        parts, segments, lang = [], [], None
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            pending = {}
+            nxt = 0
+
+            def top_up():
+                nonlocal nxt
+                while nxt < len(chunks) and len(pending) < workers:
+                    pending[nxt] = pool.submit(fetch, chunks[nxt])
+                    nxt += 1
+            top_up()
+            for i, rng in enumerate(chunks):
+                part, path = pending.pop(i).result()
+                top_up()  # keep downloads running while this batch is transcribed
+                parts.append(part)
+                tj = names(rng)[1]
+                if whisper:
+                    tr = read_json(tj)
+                    if tr is None and path:
+                        try:
+                            log(f"Transcribing batch {i + 1}/{len(chunks)} ({fmt_ts(rng[0])} - {fmt_ts(rng[1])}) ...")
+                            tr = self._whisper(path, rng[0])
+                            atomic_write_json(tj, tr)
+                        except TranscriptionError as exc:
+                            warnings.append(f"Transcription stopped ({exc.message}). {exc.hint}")
+                            whisper = False
+                    if tr:
+                        segments += tr["segments"]
+                        lang = lang or tr.get("language")
+                if path:
+                    Path(path).unlink(missing_ok=True)
+        transcript = None
+        if segments:
+            transcript = {"language": lang, "backend": "whisper", "model": model, "ranges": [[a, b]],
+                          "segments": sorted(segments, key=lambda x: x["start"])}
+        return audio_analyzer.merge_audio(parts), transcript
+
+    def _transcribe_candidates(self, ctx, audio, visual, heatmap, count, warnings) -> dict | None:
+        """No captions: Whisper listens only to the most promising moments, fetched as small audio sections."""
+        from concurrent.futures import ThreadPoolExecutor
+        src, meta, wd = ctx["source"], ctx["meta"], ctx["work"]
+        tpath = wd / f"transcript_fast_{self.cfg['whisper_model']}.json"
+        cached = read_json(tpath)
+        pre = clip_selector.select_clips(meta["duration"], visual, audio, None, ctx["template"],
+                                         self.store.used_segments(src["video_id"])
+                                         + self.excluded_by_range(meta["duration"]), count,
+                                         candidate_pool=max(12, count * 4), heatmap=heatmap)
+        ranges = merge_intervals([[max(0.0, c["start"] - 20), min(meta["duration"], c["end"] + 20)]
+                                  for c in pre["candidates"]])
+        have = (cached or {}).get("ranges") or []
+        need = [r for r in ranges if not any(h[0] <= r[0] and r[1] <= h[1] for h in have)]
+        if not need:
+            return cached
+        log(f"Transcribing {len(need)} candidate section(s) with Whisper ...")
+        tdir = wd / "whisper"
+        workers = max(1, int(self.cfg.get("download_workers") or 1))
+        with ThreadPoolExecutor(max_workers=workers) as pool:  # downloads in parallel, Whisper one by one
+            futures = [pool.submit(source_input.download_youtube_audio_section, src, tdir, s, e) for s, e in need]
+            segments = list((cached or {}).get("segments") or [])
+            lang = (cached or {}).get("language")
+            try:
+                for (s, e), fut in zip(need, futures):
+                    path = fut.result()
+                    try:
+                        tr = self._whisper(path, s)
+                    finally:
+                        Path(path).unlink(missing_ok=True)
+                    lang = tr.get("language") or lang
+                    segments += tr["segments"]
+                    have = have + [[s, e]]
+                    atomic_write_json(tpath, {"language": lang, "backend": tr.get("backend"),
+                                              "model": self.cfg["whisper_model"], "ranges": have,
+                                              "segments": sorted(segments, key=lambda x: x["start"])})
+            except TranscriptionError as exc:
+                warnings.append(f"Transcription unavailable ({exc.message}). {exc.hint}")
+        return read_json(tpath) or cached
+
     # ------------------------------------------------------------------ select
     def select(self, ctx: dict, analysis: dict, count: int, *, plan_clips: list[dict] | None = None,
                use_ai: bool = True) -> tuple[list[dict], dict, list[str]]:
         src, meta = ctx["source"], ctx["meta"]
         used = self.store.used_segments(src["video_id"], include_active=True)
+        outside = self.excluded_by_range(meta["duration"])
         sel = clip_selector.select_clips(meta["duration"], analysis["visual"], analysis["audio"],
-                                         analysis["transcript"], ctx["template"], used, count,
-                                         candidate_pool=max(12, count * 4))
+                                         analysis["transcript"], ctx["template"], used + outside, count,
+                                         candidate_pool=max(12, count * 4), heatmap=analysis.get("heatmap"))
         warnings = []
         atomic_write_json(ctx["work"] / "candidates.json", sel)
         if plan_clips:
@@ -174,16 +377,22 @@ class Pipeline:
         atomic_write_json(jdir / "job.json", job)
         results = []
         same_day = len(list(folder.glob("*.mp4")))
+        prefetch = self._prefetch_sections(ctx, [c for c in job["clips"] if c.get("status") != "completed"])
         for i, clip in enumerate(job["clips"]):
             if clip.get("status") == "completed" and clip.get("output_path") and Path(clip["output_path"]).exists():
                 results.append({**clip, "skipped": "already completed"})
                 continue
-            res = self._produce_one(ctx, analysis, clip, folder, jdir, job_id, preset, captions, same_day)
+            res = self._produce_one(ctx, analysis, clip, folder, jdir, job_id, preset, captions, same_day,
+                                    prefetch.get((clip["start"], clip["end"])))
             same_day += 1 if res["status"] == "completed" else 0
             job["clips"][i] = {**clip, **{k: res.get(k) for k in ("status", "filename", "output_path", "error",
                                                                    "clip_id")}}
             atomic_write_json(jdir / "job.json", job)
             results.append(res)
+        if prefetch:
+            prefetch_pool = prefetch.pop("_pool", None)
+            if prefetch_pool:
+                prefetch_pool.shutdown(wait=True)
         job["finished"] = now_iso()
         job["status"] = "completed" if all(r["status"] == "completed" or r.get("skipped") for r in results) else (
             "partial" if any(r["status"] == "completed" for r in results) else "failed")
@@ -192,7 +401,32 @@ class Pipeline:
         atomic_write_json(jdir / "result.json", result)
         return result
 
-    def _produce_one(self, ctx, analysis, clip, folder, jdir, job_id, preset, captions, same_day) -> dict:
+    def _prefetch_sections(self, ctx: dict, clips: list[dict]) -> dict:
+        """Fast mode: start downloading every clip's section in parallel while earlier clips render."""
+        if not ctx.get("fast") or not clips:
+            return {}
+        from concurrent.futures import ThreadPoolExecutor
+        pool = ThreadPoolExecutor(max_workers=max(1, int(self.cfg.get("download_workers") or 1)))
+        out: dict = {"_pool": pool}
+        for c in clips:
+            out[(c["start"], c["end"])] = pool.submit(self._fetch_section, ctx, c["start"], c["end"])
+        return out
+
+    def _fetch_section(self, ctx: dict, start: float, end: float) -> tuple[Path, float]:
+        src, meta = ctx["source"], ctx["meta"]
+        s0, e0 = source_input.section_range(start, end, meta["duration"], float(self.cfg.get("section_padding", 3)))
+        path = source_input.download_youtube_section(src, ctx["work"] / "sections", s0, e0,
+                                                     int(self.cfg["download_max_height"]),
+                                                     exact=bool(self.cfg.get("exact_section_cuts")))
+        # A stream-copied section may begin at the keyframe before s0. If the file is longer than asked,
+        # the extra is at the start, so its first frame is at e0 - duration on the source timeline.
+        got = video_analyzer.probe(path)["duration"]
+        if got > (e0 - s0) + 0.3:
+            s0 = max(0.0, round(e0 - got, 3))
+        return path, s0
+
+    def _produce_one(self, ctx, analysis, clip, folder, jdir, job_id, preset, captions, same_day,
+                     section_future=None) -> dict:
         src, meta, template = ctx["source"], ctx["meta"], ctx["template"]
         cfg = self.cfg
         label = clip.get("label") or "best_moment"
@@ -200,11 +434,21 @@ class Pipeline:
                                      label=label, overlap_reason=clip.get("overlap_reason"))
         base = {"clip_id": clip_id, "label": label, "source_range": [clip["start"], clip["end"]],
                 "source_timestamp": f"{fmt_ts(clip['start'])} - {fmt_ts(clip['end'])}", "warnings": []}
+        section_path, source_path, source_start = None, src.get("local_path"), 0.0
+        visual = analysis["visual"]
         try:
+            if ctx.get("fast"):
+                section_path, source_start = (section_future.result() if section_future
+                                              else self._fetch_section(ctx, clip["start"], clip["end"]))
+                source_path = str(section_path)
+                meta = video_analyzer.probe(section_path)
+                visual = video_analyzer.shift_visual(
+                    video_analyzer.analyze_visual(section_path, meta, cfg["analysis_fps"], cfg["face_detect_fps"]),
+                    source_start)
             fps = video_renderer.output_fps(meta["fps"], cfg["max_fps"])
             edit = video_editor.plan_edit(clip, template, analysis["audio"], analysis["transcript"], fps)
             layout = smart_cropper.plan_layout(meta["width"], meta["height"], self.out_w, self.out_h,
-                                               template["layout"], analysis["visual"], clip["start"], clip["end"],
+                                               template["layout"], visual, clip["start"], clip["end"],
                                                edit["tmap"])
             base["warnings"] += layout["notes"]
             words = caption_generator.clean_words(edit["words"], cfg.get("caption_corrections"),
@@ -262,7 +506,7 @@ class Pipeline:
                     continue
                 self.store.mark_rendering(src["video_id"], clip_id, n)
                 try:
-                    rinfo = video_renderer.render(source_path=src["local_path"], meta=meta, edit=edit, layout=layout,
+                    rinfo = video_renderer.render(source_path=source_path, source_start=source_start, meta=meta, edit=edit, layout=layout,
                                                   captions_path=str(cap_path) if cap_path else None, tmp_dir=jdir,
                                                   out_w=self.out_w, out_h=self.out_h, cfg=cfg, music=music,
                                                   profile=profile, name=clip_id)
@@ -311,6 +555,8 @@ class Pipeline:
             if final["profile"] != "full":
                 res["warnings"].append(f"Rendered with fallback profile '{final['profile']}' after earlier attempts failed.")
             atomic_write_json(jdir / f"{clip_id}.risk.json", risk)
+            if section_path:
+                Path(section_path).unlink(missing_ok=True)  # the Short is saved; free the disk space
             return res
         except SkillError as exc:
             self.store.mark_failed(src["video_id"], clip_id, exc.message)
@@ -404,7 +650,9 @@ def analyze_only(value: str, rights: str | None, *, template_id: str | None = No
         "status": "analyzed", "video_id": ctx["source"]["video_id"], "template": ctx["template"]["id"],
         "source": {k: ctx["source"].get(k) for k in ("kind", "title", "url", "creator", "channel_url", "duration")},
         "content_hint": analysis["visual"].get("content_hint"),
-        "facecam_detected": bool(analysis["visual"].get("facecam")),
+        "facecam_detected": (None if ctx.get("fast") else bool(analysis["visual"].get("facecam"))),
+        "analysis_mode": "fast" if ctx.get("fast") else "full",
+        "replay_heatmap": bool(analysis.get("heatmap")),
         "has_transcript": analysis["transcript"] is not None,
         "previously_completed": [{"range": f"{fmt_ts(c['start'])} - {fmt_ts(c['end'])}", "file": c["filename"],
                                   "date": c["processing_date"]} for c in rec.get("clips", [])

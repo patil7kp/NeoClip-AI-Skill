@@ -119,6 +119,36 @@ def analyze_audio(path: Path | str, meta: dict, start: float = 0.0, end: float |
     }
 
 
+def shift_audio(audio: dict, offset: float) -> dict:
+    """Move the analysis of a chunk that starts at `offset` onto the source timeline."""
+    out = dict(audio)
+    out["times"] = [round(t + offset, 3) for t in audio["times"]]
+    for key in ("silences", "possible_music"):
+        out[key] = [[round(s + offset, 2), round(e + offset, 2)] for s, e in audio.get(key, [])]
+    out["spikes"] = [{**sp, "t": round(sp["t"] + offset, 3)} for sp in audio.get("spikes", [])]
+    return out
+
+
+def merge_audio(parts: list[dict]) -> dict:
+    """Join chunk analyses (already shifted, in time order) into one timeline."""
+    parts = [p for p in parts if p]
+    if not parts:
+        return {"has_audio": False, "window": WIN, "times": [], "rms_db": [], "flatness": [], "energy_z": [],
+                "silences": [], "spikes": [], "possible_music": [], "noise_floor_db": None}
+    out = {"has_audio": any(p.get("has_audio") for p in parts), "window": WIN}
+    for key in ("times", "rms_db", "flatness", "energy_z"):
+        out[key] = [v for p in parts for v in p.get(key, [])]
+    out["silences"] = merge_intervals([x for p in parts for x in p.get("silences", [])])
+    out["possible_music"] = merge_intervals([x for p in parts for x in p.get("possible_music", [])], gap=1.5)
+    out["spikes"] = [x for p in parts for x in p.get("spikes", [])]
+    floors = sorted(p["noise_floor_db"] for p in parts if p.get("noise_floor_db") is not None)
+    out["noise_floor_db"] = floors[len(floors) // 2] if floors else None
+    thr = sorted(p["silence_threshold_db"] for p in parts if p.get("silence_threshold_db") is not None)
+    if thr:
+        out["silence_threshold_db"] = thr[len(thr) // 2]
+    return out
+
+
 def _rolling_median(arr, k: int):
     np = _np()
     if len(arr) <= k:

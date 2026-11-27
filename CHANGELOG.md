@@ -2,6 +2,18 @@
 
 NeoClip-AI-Skill, created by Kiran Patil. © 2026 Kiran Patil. All Rights Reserved.
 
+## Unreleased
+- **Fast YouTube mode (default):** no full-video download. Audio is fetched in 1-hour batches (parallel,
+  bounded disk use, resumable per batch), analysed and transcribed with Whisper, then deleted. Only the chosen
+  clips are downloaded at full quality, in parallel while earlier clips render, and deleted once saved.
+- Whisper transcribes the real audio; YouTube captions are only used with `--youtube-captions`.
+  Long videos (over 3 hours by default) transcribe the strongest moments; `--transcribe full` covers everything.
+- YouTube "most replayed" graph used as an extra selection signal.
+- New options: `--range`, `--transcribe`, `--full-download`, `--youtube-captions`, `--workers`;
+  config `whisper_beam_size`, `hw_encoder`, `exact_section_cuts`, `audio_chunk_minutes`.
+- Hardware encoding (VideoToolbox / NVENC) when available, with automatic fallback to x264.
+- Fixed `templates set <id> captions.uppercase=false`.
+
 ## 1.0.0 (2026-11-27)
 First release.
 - Branded as **NeoClip-AI-Skill** by Kiran Patil. Added `AUTHOR.md`, an all-rights-reserved `LICENSE` and

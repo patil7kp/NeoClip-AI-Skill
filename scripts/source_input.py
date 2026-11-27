@@ -134,6 +134,13 @@ def youtube_metadata(url: str) -> dict:
         "has_chapters": bool(info.get("chapters")),
         "chapters": [{"start": c.get("start_time"), "end": c.get("end_time"), "title": c.get("title")}
                      for c in (info.get("chapters") or [])],
+        # "Most replayed" graph (only on some videos): [{start, end, value 0..1}]
+        "heatmap": [{"start": float(h.get("start_time") or 0), "end": float(h.get("end_time") or 0),
+                     "value": float(h.get("value") or 0)} for h in (info.get("heatmap") or [])
+                    if h.get("end_time") is not None],
+        "subtitle_langs": sorted((info.get("subtitles") or {}).keys()),
+        "auto_caption_langs": sorted((info.get("automatic_captions") or {}).keys()),
+        "language": info.get("language"),
     }
 
 
@@ -154,6 +161,93 @@ def download_youtube(source: dict, dest_dir: Path, max_height: int = 2160) -> Pa
     files = [p for p in dest_dir.glob("source.*") if p.suffix in SUPPORTED_EXTENSIONS]
     if not files:
         raise SourceUnavailableError("Download finished but no video file was produced.")
+    return files[0]
+
+
+# --------------------------------------------------------------------------- fast YouTube path
+# Instead of downloading the whole (often multi-GB) video, the fast path fetches:
+#   1. metadata + "most replayed" heatmap + chapters      (no download)
+#   2. YouTube captions as the transcript                 (a few KB)
+#   3. audio only, for loudness / pause analysis           (about 0.5 MB per minute)
+#   4. only the chosen clip ranges, at full quality        (one short section per Short)
+def _pick_sub_lang(langs: list[str], preferred: str | None, original: str | None) -> str | None:
+    wanted = [x for x in (preferred, original) if x] + ["en", "en-US", "en-GB"]
+    for w in wanted:
+        for cand in (f"{w}-orig", w):
+            if cand in langs:
+                return cand
+    for w in wanted:  # e.g. "en" matches "en-IN"
+        for lang in langs:
+            if lang.split("-")[0] == w.split("-")[0]:
+                return lang
+    origs = [x for x in langs if x.endswith("-orig")]
+    return origs[0] if origs else None
+
+
+def download_youtube_subtitles(source: dict, dest_dir: Path, language: str | None = None) -> Path | None:
+    """Fetch the video's own captions (manual first, then auto-generated). Returns a .vtt path or None."""
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    for existing in sorted(dest_dir.glob("subs.*.vtt")):
+        if existing.stat().st_size > 0:
+            return existing
+    plans = [("--write-subs", source.get("subtitle_langs") or []),
+             ("--write-auto-subs", source.get("auto_caption_langs") or [])]
+    for flag, langs in plans:
+        lang = _pick_sub_lang(langs, language, source.get("language"))
+        if not lang:
+            continue
+        log(f"Fetching YouTube captions ({'auto-generated' if 'auto' in flag else 'uploaded'}, {lang}) ...")
+        proc = run(["yt-dlp", "--no-playlist", "--no-warnings", "--skip-download", flag, "--sub-langs", lang,
+                    "--sub-format", "vtt", "-o", str(dest_dir / "subs.%(ext)s"), source["url"]],
+                   timeout=180, check=False)
+        files = [p for p in dest_dir.glob("subs.*.vtt") if p.stat().st_size > 0]
+        if proc.returncode == 0 and files:
+            return files[0]
+    return None
+
+
+def download_youtube_audio_section(source: dict, dest_dir: Path, start: float, end: float) -> Path:
+    """Low-bitrate audio for [start, end] only (about 0.4 MB per minute)."""
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    stem = f"audio_{start:.0f}_{end:.0f}"
+    for existing in dest_dir.glob(stem + ".*"):
+        if not existing.name.endswith((".part", ".ytdl")) and existing.stat().st_size > 0:
+            return existing
+    proc = run(["yt-dlp", "--no-playlist", "--no-warnings", "-f", "wa[abr>=32]/ba[abr<=96]/wa/ba",
+                "--download-sections", f"*{start:.3f}-{end:.3f}",
+                "-o", str(dest_dir / f"{stem}.%(ext)s"), source["url"]], timeout=None, check=False)
+    if proc.returncode != 0:
+        raise _classify_ytdlp_error(proc.stderr.decode("utf-8", "replace"))
+    files = [p for p in dest_dir.glob(stem + ".*") if not p.name.endswith((".part", ".ytdl"))]
+    if not files:
+        raise SourceUnavailableError("Audio download finished but no file was produced.")
+    return files[0]
+
+
+def section_range(start: float, end: float, duration: float, pad: float = 3.0) -> tuple[float, float]:
+    return max(0.0, round(start - pad, 3)), min(duration or end + pad, round(end + pad, 3))
+
+
+def download_youtube_section(source: dict, dest_dir: Path, start: float, end: float,
+                             max_height: int = 2160, exact: bool = False) -> Path:
+    """Download only [start, end] (seconds) at full quality. By default the streams are copied (no extra
+    encode, so no quality loss); `exact` re-encodes at the cut points instead."""
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    stem = f"section_{start:.3f}_{end:.3f}".replace(".", "-")
+    for existing in dest_dir.glob(stem + ".*"):
+        if existing.suffix in SUPPORTED_EXTENSIONS and existing.stat().st_size > 0:
+            return existing
+    fmt = f"bv*[height<={max_height}]+ba/b[height<={max_height}]/b"
+    log(f"Downloading only {start:.1f}s - {end:.1f}s (<= {max_height}p) ...")
+    proc = run(["yt-dlp", "--no-playlist", "--no-warnings", "-f", fmt, "--merge-output-format", "mp4",
+                "--download-sections", f"*{start:.3f}-{end:.3f}",
+                *(["--force-keyframes-at-cuts"] if exact else []),
+                "-o", str(dest_dir / f"{stem}.%(ext)s"), source["url"]], timeout=None, check=False)
+    if proc.returncode != 0:
+        raise _classify_ytdlp_error(proc.stderr.decode("utf-8", "replace"))
+    files = [p for p in dest_dir.glob(stem + ".*") if p.suffix in SUPPORTED_EXTENSIONS]
+    if not files:
+        raise SourceUnavailableError("Section download finished but no video file was produced.")
     return files[0]
 
 

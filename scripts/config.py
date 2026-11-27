@@ -28,8 +28,18 @@ DEFAULTS: dict[str, Any] = {
     "whisper_device": "auto",              # auto | cpu | cuda
     "whisper_compute_type": "auto",
     "language": None,                      # None = auto-detect
-    "transcribe_scope": "auto",            # full | candidates | auto (candidates for > 45 min)
+    "transcribe_scope": "auto",            # full | candidates | auto (see full_transcribe_max_hours)
+    "full_transcribe_max_hours": 3,        # fast YouTube mode, auto scope: transcribe everything up to this length
+    "whisper_beam_size": 5,                # 1 is ~2x faster with slightly lower accuracy
+    "youtube_captions": False,             # True = use YouTube's own captions instead of Whisper (not default)
+    "hw_encoder": "auto",                  # auto (VideoToolbox / NVENC if present, else x264) | off
+    "exact_section_cuts": False,           # True = re-encode clip sections at exact cut points (slower)
     "download_max_height": 2160,
+    "youtube_mode": "fast",                # fast: captions + audio chunks + clip sections only | full: whole video
+    "audio_chunk_minutes": 60,             # fast mode: audio is fetched, analysed and deleted chunk by chunk
+    "download_workers": 3,                 # parallel chunk / clip-section downloads
+    "section_padding": 3.0,                # seconds fetched around each clip in fast mode
+    "analyze_range": None,                 # [start, end] seconds: only look for moments in this part
     "default_count": 3,
     "max_render_attempts": 3,
     "fontsdir": None,                      # folder with caption fonts; None = system fonts

@@ -53,11 +53,34 @@ def _common(p: argparse.ArgumentParser, needs_rights: bool = True) -> None:
     p.add_argument("--source-url", help="original video URL (local files)")
     p.add_argument("--title", help="override source title")
     p.add_argument("--dry-run", action="store_true", help="select clips but do not render")
+    p.add_argument("--range", dest="analyze_range", metavar="START-END",
+                   help="only look for moments in this part, e.g. 2:00:00-5:30:00")
+    p.add_argument("--transcribe", choices=["auto", "full", "candidates"],
+                   help="Whisper the whole video (full) or only the strongest moments (candidates); "
+                        "auto = full up to 3 hours")
+    p.add_argument("--full-download", action="store_true",
+                   help="YouTube: download the whole video first (slow; default fetches audio batches + clips)")
+    p.add_argument("--youtube-captions", action="store_true",
+                   help="YouTube: use the video's own captions instead of Whisper")
+    p.add_argument("--workers", type=int, help="parallel downloads (default 3)")
+
+
+def _parse_range(value: str | None) -> list[str] | None:
+    if not value:
+        return None
+    if value.count("-") != 1:
+        raise SystemExit("--range must look like START-END, e.g. 1:00:00-3:30:00")
+    return [x.strip() for x in value.split("-")]
 
 
 def _overrides(a) -> dict:
     return {"resolution": getattr(a, "resolution", None), "output_root": getattr(a, "output_root", None),
-            "whisper_model": getattr(a, "whisper_model", None), "language": getattr(a, "language", None)}
+            "whisper_model": getattr(a, "whisper_model", None), "language": getattr(a, "language", None),
+            "analyze_range": _parse_range(getattr(a, "analyze_range", None)),
+            "transcribe_scope": getattr(a, "transcribe", None),
+            "youtube_mode": "full" if getattr(a, "full_download", False) else None,
+            "youtube_captions": True if getattr(a, "youtube_captions", False) else None,
+            "download_workers": getattr(a, "workers", None)}
 
 
 def _src_kw(a) -> dict:

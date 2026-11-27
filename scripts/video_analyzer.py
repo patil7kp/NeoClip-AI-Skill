@@ -36,7 +36,7 @@ def _fps(rate: str | None) -> float:
     return float(rate)
 
 
-def probe(path: Path | str) -> dict:
+def probe(path: Path | str, require_video: bool = True) -> dict:
     """Return duration, display width/height, fps, codecs and audio info. Raises on undecodable input."""
     require_binary("ffprobe")
     proc = run(["ffprobe", "-v", "error", "-print_format", "json", "-show_format", "-show_streams",
@@ -50,8 +50,9 @@ def probe(path: Path | str) -> dict:
     video = next((s for s in streams if s.get("codec_type") == "video"
                   and not (s.get("disposition") or {}).get("attached_pic")), None)
     audio = next((s for s in streams if s.get("codec_type") == "audio"), None)
-    if not video:
+    if not video and require_video:
         raise UnsupportedFormatError(f"{path} has no video stream.")
+    video = video or {}
     width, height = int(video.get("width") or 0), int(video.get("height") or 0)
     rotation = 0
     for sd in video.get("side_data_list") or []:
@@ -60,7 +61,8 @@ def probe(path: Path | str) -> dict:
     rotation = int((video.get("tags") or {}).get("rotate", rotation))
     if abs(rotation) % 180 == 90:
         width, height = height, width
-    duration = float((data.get("format") or {}).get("duration") or video.get("duration") or 0)
+    duration = float((data.get("format") or {}).get("duration") or video.get("duration")
+                     or (audio or {}).get("duration") or 0)
     fps = _fps(video.get("avg_frame_rate")) or _fps(video.get("r_frame_rate"))
     return {
         "duration": duration,
@@ -271,6 +273,23 @@ def analyze_visual(path: Path | str, meta: dict, sample_fps: float = 2.0, face_f
         "content_hint": content_hint,
         "face_backend": detector.backend,
     }
+
+
+def empty_visual(sample_fps: float = 2.0) -> dict:
+    """Placeholder when the whole video was not downloaded (fast YouTube mode)."""
+    return {"sample_fps": sample_fps, "face_fps": 1.0, "analysis_size": [0, 0], "times": [], "motion": [],
+            "motion_cx": [], "motion_cy": [], "brightness": [], "scene_cuts": [], "faces": [],
+            "face_samples": 0, "facecam": None, "content_hint": "unknown", "face_backend": None,
+            "partial": True}
+
+
+def shift_visual(visual: dict, offset: float) -> dict:
+    """Move a visual analysis of a downloaded section onto the source timeline."""
+    out = dict(visual)
+    out["times"] = [round(t + offset, 3) for t in visual["times"]]
+    out["scene_cuts"] = [round(t + offset, 3) for t in visual["scene_cuts"]]
+    out["faces"] = [{**f, "t": round(f["t"] + offset, 3)} for f in visual["faces"]]
+    return out
 
 
 # --------------------------------------------------------------------------- facecam

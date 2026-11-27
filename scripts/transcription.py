@@ -46,7 +46,7 @@ def _extract_wav(src: Path, start: float, end: float, dest: Path) -> None:
 
 
 def _faster_whisper(path: Path, model: str, language: str | None, device: str, compute_type: str,
-                    offset: float) -> tuple[list[dict], str]:
+                    offset: float, beam_size: int = 5) -> tuple[list[dict], str]:
     from faster_whisper import WhisperModel
     if device == "auto":
         device = "cpu"
@@ -63,7 +63,7 @@ def _faster_whisper(path: Path, model: str, language: str | None, device: str, c
         m = WhisperModel(model, device=device, compute_type=compute_type)
         _MODEL_CACHE[(model, device, compute_type)] = m
     segments, info = m.transcribe(str(path), language=language, word_timestamps=True, vad_filter=True,
-                                  beam_size=5, condition_on_previous_text=False)
+                                  beam_size=beam_size, condition_on_previous_text=False)
     out = []
     for s in segments:
         words = [{"start": round(w.start + offset, 3), "end": round(w.end + offset, 3), "word": w.word.strip(),
@@ -95,7 +95,7 @@ _MODEL_CACHE: dict = {}
 
 def transcribe(path: Path | str, model: str = "small", language: str | None = None,
                ranges: list[list[float]] | None = None, device: str = "auto",
-               compute_type: str = "auto") -> dict:
+               compute_type: str = "auto", beam_size: int = 5) -> dict:
     """Transcribe the full file, or only `ranges` (absolute [start, end] seconds)."""
     path = Path(path)
     backend = available_backend()
@@ -108,7 +108,7 @@ def transcribe(path: Path | str, model: str = "small", language: str | None = No
     try:
         if not ranges:
             if backend == "faster-whisper":
-                segments, lang = _faster_whisper(path, model, language, device, compute_type, 0.0)
+                segments, lang = _faster_whisper(path, model, language, device, compute_type, 0.0, beam_size)
             else:
                 segments, lang = _openai_whisper(path, model, language, 0.0)
         else:
@@ -117,7 +117,7 @@ def transcribe(path: Path | str, model: str = "small", language: str | None = No
                     wav = Path(td) / f"r{i}.wav"
                     _extract_wav(path, s, e, wav)
                     if backend == "faster-whisper":
-                        segs, lang = _faster_whisper(wav, model, language, device, compute_type, s)
+                        segs, lang = _faster_whisper(wav, model, language, device, compute_type, s, beam_size)
                     else:
                         segs, lang = _openai_whisper(wav, model, language, s)
                     segments.extend(segs)
@@ -137,9 +137,54 @@ _SRT_TIME = re.compile(r"(\d+:\d{2}:\d{2}[.,]\d{1,3})\s*-->\s*(\d+:\d{2}:\d{2}[.
 _VTT_TIME = re.compile(r"((?:\d+:)?\d{2}:\d{2}[.,]\d{1,3})\s*-->\s*((?:\d+:)?\d{2}:\d{2}[.,]\d{1,3})")
 
 
+_INLINE_TS = re.compile(r"<(\d{1,2}:\d{2}:\d{2}[.,]\d{3}|\d{2}:\d{2}[.,]\d{3})>")
+
+
+def parse_youtube_auto_vtt(text: str) -> list[dict] | None:
+    """YouTube auto-captions carry per-word times (<00:00:01.230><c> word</c>) and repeat the previous
+    line in every cue. Return de-duplicated segments with real word times, or None if not that format."""
+    if not _INLINE_TS.search(text):
+        return None
+    segments = []
+    for block in re.split(r"\n\s*\n", text.replace("\r", "")):
+        lines = [ln for ln in block.strip().split("\n") if ln.strip()]
+        for i, ln in enumerate(lines):
+            m = _VTT_TIME.search(ln)
+            if not m:
+                continue
+            cs, ce = parse_ts(m.group(1).replace(",", ".")), parse_ts(m.group(2).replace(",", "."))
+            for body in lines[i + 1:]:
+                if not _INLINE_TS.search(body):
+                    continue  # repeated line from the previous cue
+                pieces = _INLINE_TS.split(body)
+                words = []
+                first = re.sub(r"<[^>]+>", "", pieces[0]).strip()
+                for w in first.split():
+                    words.append({"start": cs, "word": w})
+                for k in range(1, len(pieces), 2):
+                    t = parse_ts(pieces[k].replace(",", "."))
+                    for w in re.sub(r"<[^>]+>", "", pieces[k + 1]).split():
+                        words.append({"start": t, "word": w})
+                for j, w in enumerate(words):
+                    nxt = words[j + 1]["start"] if j + 1 < len(words) else ce
+                    w["end"] = round(max(w["start"] + 0.05, min(nxt, w["start"] + 1.5)), 3)
+                    w["start"] = round(w["start"], 3)
+                    w["prob"] = 1.0
+                if words:
+                    segments.append({"start": words[0]["start"], "end": words[-1]["end"],
+                                     "text": " ".join(w["word"] for w in words), "words": words})
+            break
+    return segments or None
+
+
 def load_subtitles(path: Path | str) -> dict:
-    """Parse .srt/.vtt into the transcript format. Word times are interpolated by character length."""
+    """Parse .srt/.vtt into the transcript format. Word times are interpolated by character length,
+    except YouTube auto-captions, which carry real per-word times."""
     text = Path(path).read_text(encoding="utf-8", errors="replace")
+    auto = parse_youtube_auto_vtt(text)
+    if auto:
+        return {"language": "unknown", "backend": "youtube-auto-captions", "model": None, "ranges": None,
+                "segments": auto}
     segments = []
     blocks = re.split(r"\n\s*\n", text.replace("\r", ""))
     for block in blocks:
@@ -150,7 +195,8 @@ def load_subtitles(path: Path | str) -> dict:
                 s = parse_ts(m.group(1).replace(",", "."))
                 e = parse_ts(m.group(2).replace(",", "."))
                 body = " ".join(re.sub(r"<[^>]+>", "", x) for x in lines[i + 1:]).strip()
-                if body and e > s:
+                if body and e > s and not (segments and segments[-1]["text"] == body
+                                           and s - segments[-1]["end"] < 0.5):
                     segments.append({"start": s, "end": e, "text": body, "words": interpolate_words(body, s, e)})
                 break
     if not segments:

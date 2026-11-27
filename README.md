@@ -143,6 +143,46 @@ python scripts/cli.py templates reset gaming-reaction
 ```
 Speed: `--resolution 1080x1920` renders about 4× faster than the 4K default.
 
+## Long YouTube videos (fast mode)
+
+YouTube videos are **never downloaded in full** by default. Instead the engine:
+
+1. Reads the video's details and YouTube's "most replayed" graph (no download).
+2. Fetches low-quality audio in **1-hour batches**, 3 at a time. Each batch gets a loudness pass and a
+   **Whisper transcript of the real audio**, then its audio file is deleted. Results are saved per batch, so a
+   stopped run continues from the last finished batch.
+3. Picks the best moments from the transcript, the loudness and the replay graph.
+4. Downloads **only the chosen clips** in full quality, in parallel, while earlier clips render. Each clip file
+   is deleted once its Short is saved.
+
+YouTube's own captions are not used unless you ask for them with `--youtube-captions`.
+
+**Rough estimates for a 25-hour stream** (not measured on a real 25-hour video; depends on your connection
+and computer):
+
+| Step | Time | Disk space |
+|---|---|---|
+| Video details + replay graph | seconds | none |
+| Audio, 25 batches | about 5–20 min to download, 1–3 min to analyse | under 100 MB at any moment |
+| Whisper, default for videos over 3 hours: only the strongest moments | about 2–10 min | small |
+| Whisper, `--transcribe full`: every hour | about 2.5–4 h on a modern CPU (small model), 1–2 h with `--whisper-model base`, 20–60 min on an NVIDIA GPU | small |
+| Each chosen clip | under a minute to download | about 20–60 MB per clip at 4K, deleted afterwards |
+| Rendering | about 1 min per Short with a hardware encoder, several minutes with x264 at 4K | the finished Shorts |
+
+The old way downloaded the whole video first (often 10–50 GB for 25 hours at 4K) before anything else could start.
+
+Useful options:
+```bash
+python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --rights own --range 2:00:00-6:00:00   # only search part of it
+python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --rights own --transcribe full          # Whisper every hour
+python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --rights own --whisper-model base       # faster Whisper
+python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --rights own --workers 5                # more parallel downloads
+python scripts/cli.py run "https://youtu.be/XXXXXXXXXXX" --rights own --full-download            # old behaviour
+```
+
+Rendering uses Apple VideoToolbox or NVIDIA NVENC automatically when FFmpeg has them, and falls back to x264 if
+they fail. For the highest quality at the cost of speed, set `"hw_encoder": "off"` in the config.
+
 ## Configuration
 Optional `~/.neoclip-ai-skill/config.json` (all keys: `scripts/config.py`):
 ```json
@@ -155,7 +195,7 @@ Environment: `YT_SHORTS_STATE_DIR`, `YT_SHORTS_OUTPUT_ROOT`, `YT_SHORTS_RESOLUTI
 
 ## Tests
 ```bash
-python -m pytest -q      # 67 tests, about 1 minute, needs FFmpeg
+python -m pytest -q      # 76 tests, about 1 minute, needs FFmpeg
 ```
 
 ## Honest limitations
@@ -167,6 +207,8 @@ python -m pytest -q      # 67 tests, about 1 minute, needs FFmpeg
 - **Policy screening** can't see visual nudity or gore and can't judge fair use. It flags potential risks and
   is not legal advice.
 - **4K**: most sources are upscaled when converted to 9:16 4K. Every result says so.
+- **Fast mode framing** checks faces and the facecam inside each downloaded clip, not across the whole video.
+  Use `--full-download` if a template needs whole-video visual analysis.
 - **YouTube downloads** depend on yt-dlp and YouTube's current behaviour. Private, age-gated, members-only or
   region-blocked videos are not supported and are not bypassed.
 

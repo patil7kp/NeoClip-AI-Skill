@@ -105,11 +105,17 @@ def cue_hits(transcript: dict | None) -> list[dict]:
     return hits
 
 
+REPLAY_WEIGHT = 1.4  # YouTube "most replayed" graph: viewers rewatched this part
+
+
 def build_timeline(duration: float, visual: dict | None, audio: dict | None,
-                   transcript: dict | None) -> dict:
+                   transcript: dict | None, heatmap: list[dict] | None = None) -> dict:
     n = max(1, int(math.ceil(duration)))
     feat = {k: [0.0] * n for k in ("audio_energy", "audio_spike", "motion", "scene_change", "speech",
-                                   "silent", *CUES.keys())}
+                                   "silent", "replay", *CUES.keys())}
+    for h in heatmap or []:
+        for i in range(int(h["start"]), min(n, int(math.ceil(h["end"])))):
+            feat["replay"][i] = max(feat["replay"][i], float(h["value"]))
     if audio and audio.get("times"):
         for t, z in zip(audio["times"], audio["energy_z"]):
             i = int(t)
@@ -143,17 +149,20 @@ def build_timeline(duration: float, visual: dict | None, audio: dict | None,
             feat[h["category"]][i] += 1.0
     norm = {}
     for k, v in feat.items():
-        if k in ("silent", "scene_change") or k in CUES:
+        if k in ("silent", "scene_change", "replay") or k in CUES:
             norm[k] = [min(1.0, x) for x in v]
         elif k == "speech":
             norm[k] = [min(1.0, x / 3.0) for x in v]
         else:
             norm[k] = [(x + 2) / 6 for x in _robust(v)]  # map [-2,4] -> [0,1]
-    return {"n": n, "features": norm}
+    return {"n": n, "features": norm, "has_replay": bool(heatmap)}
 
 
 def interest_curve(timeline: dict, weights: dict[str, float], smooth_radius: int = 2) -> list[float]:
     f = timeline["features"]
+    weights = dict(weights)
+    if timeline.get("has_replay"):
+        weights.setdefault("replay", REPLAY_WEIGHT)
     total_w = sum(abs(w) for w in weights.values()) or 1.0
     raw = []
     for i in range(timeline["n"]):
@@ -263,6 +272,9 @@ def _dominant_cue(timeline: dict, start: float, end: float, weights: dict) -> tu
             "story": "story/explanation markers",
             "question": "questions being asked",
         }.get(k, k))
+    replay = f.get("replay", [])[a:b]
+    if replay and max(replay) >= 0.6:
+        reasons.insert(0, f"YouTube 'most replayed' peak ({max(replay):.0%} of the video's top replay level)")
     best = ranked[0][0] if ranked and ranked[0][1] > 0 else "audio_energy"
     cue_order = [k for k, v in ranked if k in CUES and k != "question" and v >= 1]
     category = cue_order[0] if cue_order else best
@@ -271,12 +283,12 @@ def _dominant_cue(timeline: dict, start: float, end: float, weights: dict) -> tu
 
 def select_clips(duration: float, visual: dict | None, audio: dict | None, transcript: dict | None,
                  template: dict, used_segments: list[list[float]] | None = None, count: int = 3,
-                 candidate_pool: int = 12) -> dict:
+                 candidate_pool: int = 12, heatmap: list[dict] | None = None) -> dict:
     """Return {"candidates": ranked list, "selected": top `count`} excluding used segments."""
     sel = template["selection"]
     dur_cfg = template["duration"]
     used = merge_intervals(used_segments or [])
-    timeline = build_timeline(duration, visual, audio, transcript)
+    timeline = build_timeline(duration, visual, audio, transcript, heatmap)
     curve = interest_curve(timeline, sel["weights"], sel.get("smooth_radius", 2))
     bounds = _sentence_bounds(transcript)
 
